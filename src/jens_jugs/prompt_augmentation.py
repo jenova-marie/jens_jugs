@@ -1,8 +1,7 @@
-# Purpose: Injects dynamic game state into the system prompt
-
-
 def build_augmented_prompt(base_prompt: str, state: dict) -> str:
-    # Sanitize game state (minimal)
+    if state is None:
+        state = {}
+
     summary_parts = [
         f"Current Rank: {state.get('rank', 'Unknown')}",
         f"Points: {state.get('points', 0)}",
