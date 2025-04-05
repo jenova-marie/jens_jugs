@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Game Rule",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the rule"
+    },
+    "condition": {
+      "type": "object",
+      "description": "Logical condition block to evaluate",
+      "properties": {
+        "all": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/conditionClause"
+          }
+        },
+        "any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/conditionClause"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/actionClause"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "condition",
+    "actions"
+  ],
+  "definitions": {
+    "conditionClause": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "==",
+            "!=",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "includes"
+          ]
+        },
+        "value": {}
+      },
+      "required": [
+        "field",
+        "operator",
+        "value"
+      ]
+    },
+    "actionClause": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "set",
+            "decrease",
+            "addNarrative"
+          ]
+        },
+        "field": {
+          "type": "string"
+        },
+        "value": {},
+        "amount": {
+          "type": "number"
+        },
+        "scene": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

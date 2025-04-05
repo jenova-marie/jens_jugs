@@ -1,0 +1,14 @@
+@startuml
+start
+:Load Game State;
+:Load Rules from JSON;
+:Evaluate Conditions;
+if (Condition met?) then (yes)
+  :Apply Rule Actions;
+  :Update Game State;
+endif
+:Augment Prompt with Results;
+:Send Final Prompt to OpenAI;
+:Return Response to Player;
+stop
+@enduml

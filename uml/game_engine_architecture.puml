@@ -1,0 +1,23 @@
+@startuml
+left to right direction
+
+actor Player
+
+rectangle "Client App" as App
+rectangle "Relay Server" as Relay
+rectangle "Prompt Augmentation" as Prompt
+rectangle "Game Logic Engine" as Logic
+database "Game State (Redis)" as State
+folder "Rule Store (JSON/Redis)" as Rules
+rectangle "OpenAI API" as OpenAI
+
+Player --> App : Interacts with UI
+App --> Relay : Sends message
+Relay --> Prompt : Augment prompt with state
+Relay --> Logic : Evaluate game rules
+Logic --> Rules : Load rule definitions
+Logic --> State : Read/write game state
+Relay --> OpenAI : Send chat completion
+OpenAI --> Relay : Return result
+Relay --> App : Return response
+@enduml

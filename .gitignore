@@ -1,0 +1,72 @@
+# macOS
+.DS_Store
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.pyo
+
+# Test cache
+.pytest_cache/
+
+# Poetry
+.poetry/
+# If you're using Poetry’s virtualenv inside the project
+.venv/
+# Just in case
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# Node
+node_modules/
+
+# Build
+dist/
+build/
+*.egg-info/
+*.eggs/
+
+# TypeScript
+*.tsbuildinfo
+
+# Lockfiles
+*.lock
+poetry.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Docs, media
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.webp
+
+# Compressed
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# Misc
+coverage/
+htmlcov/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.tox/

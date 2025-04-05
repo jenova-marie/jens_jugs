@@ -1,0 +1,12 @@
+# Python 3 requirements for the Recovery Game Engine
+
+flask==2.3.3
+redis==5.0.3
+openai==1.14.2  # confirmed working with pyenv and OpenAI() client
+
+# Optional for local dev or testing
+python-dotenv==1.0.1
+pytest==8.1.1
+
+# Safety pins to avoid proxy bug crash
+httpx>=0.27.0
