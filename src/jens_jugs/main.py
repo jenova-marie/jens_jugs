@@ -28,8 +28,10 @@ def cli(ctx, local_env):
 
 @cli.command()
 @click.option("--secret", default="JensJugs/Api/Local/Dev", help="AWS Secrets Manager secret name.")
+@click.option("--log-reset", is_flag=True, help="Reset the CloudWatch log stream.")
+@click.option("--debug", is_flag=True, help="Enable debug mode for the relay server.")
 @click.pass_context
-def start(ctx, secret):
+def start(ctx, secret, log_reset, debug):
     """Start the relay server."""
     local_env = ctx.obj["local_env"]
     secret_name = secret
@@ -51,6 +53,12 @@ def start(ctx, secret):
             raise click.ClickException("Failed to load secrets from AWS Secrets Manager")
     else:
         os.environ["SECRET_NAME"] = secret_name
+
+    # Pass the log-reset flag to the logger
+    os.environ["LOG_RESET"] = str(log_reset)
+
+    # Pass the debug flag to the relay server
+    os.environ["DEBUG_MODE"] = str(debug)
 
     relay_path = Path(__file__).parent / "relay_server.py"
     if not relay_path.exists():
