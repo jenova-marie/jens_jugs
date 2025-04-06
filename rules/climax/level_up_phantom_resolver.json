@@ -1,0 +1,28 @@
+{
+  "id": "level_up_phantom_resolver",
+  "condition": {
+    "all": [
+      {
+        "field": "level",
+        "operator": "==",
+        "value": "Truth Seeker"
+      },
+      {
+        "field": "emotional_tokens",
+        "operator": ">=",
+        "value": 28
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "set",
+      "field": "level",
+      "value": "Phantom Resolver"
+    },
+    {
+      "type": "addNarrative",
+      "flag": "level_up_phantom_resolver"
+    }
+  ]
+}

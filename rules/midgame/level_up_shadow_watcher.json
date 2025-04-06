@@ -1,0 +1,28 @@
+{
+  "id": "level_up_shadow_watcher",
+  "condition": {
+    "all": [
+      {
+        "field": "level",
+        "operator": "==",
+        "value": "Street Sleuth"
+      },
+      {
+        "field": "emotional_tokens",
+        "operator": ">=",
+        "value": 10
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "set",
+      "field": "level",
+      "value": "Shadow Watcher"
+    },
+    {
+      "type": "addNarrative",
+      "flag": "level_up_shadow_watcher"
+    }
+  ]
+}

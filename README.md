@@ -27,8 +27,8 @@ Welcome to the **Recovery Mystery Game Engine**, a Cold Case–style AI-driven n
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/your-username/jens-jugs.git
-   cd jens-jugs
+   git clone https://github.com/your-username/jens_jugs.git
+   cd jens_jugs
    ```
 
 2. Install Python (recommended via `pyenv`):

@@ -11,27 +11,27 @@ Additionally, character-specific unit tests will interrogate each suspect or wit
 
 ### ✨ Purpose
 To test:
-- If the mystery can be solved through clues and logic
-- Where the AI gets confused, misled, or fixates incorrectly
-- Whether multiple solution paths exist or bottlenecks arise
+- If the mystery can be solved through clues and logic.
+- Where the AI gets confused, misled, or fixates incorrectly.
+- Whether multiple solution paths exist or bottlenecks arise.
 
 ### 🔄 Structure
 1. **Setup**
-   - Load mystery data (characters, clues, game state)
-   - Spawn a fresh AI agent with no context
+   - Load mystery data (characters, clues, game state).
+   - Spawn a fresh AI agent with no context.
 
 2. **Simulation Loop**
-   - AI makes a move (e.g. interrogate, examine, accuse)
-   - Game engine responds (LLM or state-based)
-   - Log decision, time elapsed, and clues found
+   - AI makes a move (e.g., interrogate, examine, accuse).
+   - Game engine responds (LLM or state-based).
+   - Log decision, time elapsed, and clues found.
 
 3. **Endgame**
-   - AI succeeds or fails
-   - Reveal the solution
+   - AI succeeds or fails.
+   - Reveal the solution.
 
 4. **Reflection Phase**
-   - Ask AI to reflect on what it missed, misunderstood, or would have done differently
-   - Collect insights for narrative or design improvements
+   - Ask AI to reflect on what it missed, misunderstood, or would have done differently.
+   - Collect insights for narrative or design improvements.
 
 ### 📦 Output Format
 ```json

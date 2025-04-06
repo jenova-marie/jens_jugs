@@ -1,0 +1,22 @@
+{
+  "id": "unlock_clue_from_trust",
+  "condition": {
+    "all": [
+      {
+        "field": "trust_levels.SuspectA",
+        "operator": ">=",
+        "value": 3
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "unlockClue",
+      "clue": "cigarette_case_with_initials"
+    },
+    {
+      "type": "addNarrative",
+      "flag": "SuspectA_opens_up"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "aggressive_interrogation_penalty",
+  "condition": {
+    "all": [
+      {
+        "field": "inventory",
+        "operator": "includes",
+        "value": "interrogation_pushback_flag"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "decrease",
+      "field": "emotional_tokens",
+      "amount": 2
+    },
+    {
+      "type": "trust",
+      "target": "SuspectB",
+      "amount": -1
+    },
+    {
+      "type": "addNarrative",
+      "flag": "SuspectB_closed_off"
+    }
+  ]
+}

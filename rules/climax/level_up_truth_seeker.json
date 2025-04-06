@@ -1,0 +1,28 @@
+{
+  "id": "level_up_truth_seeker",
+  "condition": {
+    "all": [
+      {
+        "field": "level",
+        "operator": "==",
+        "value": "Shadow Watcher"
+      },
+      {
+        "field": "emotional_tokens",
+        "operator": ">=",
+        "value": 18
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "set",
+      "field": "level",
+      "value": "Truth Seeker"
+    },
+    {
+      "type": "addNarrative",
+      "flag": "level_up_truth_seeker"
+    }
+  ]
+}

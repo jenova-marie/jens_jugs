@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npx ts-node-dev --respawn --transpile-only src/relay-server.ts",
     "black": "black . --quiet && echo '✨ Beautiful like me'",
-    "tar": "tar -czf jens-jugs.tar.gz $(find . -type f \\( -name '*.md' -o -name '*.json' -o -name '*.py' -o -name '*.puml' -o -name '*.ini' -o -name '*.yml' -o -name '*.yaml' \\))",
+    "tar": "tar -czf jens_jugs.tar.gz $(find . -type f \\( -name '*.md' -o -name '*.json' -o -name '*.py' -o -name '*.puml' -o -name '*.ini' -o -name '*.yml' -o -name '*.yaml' \\))",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

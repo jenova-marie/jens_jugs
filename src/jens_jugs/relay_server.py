@@ -44,6 +44,17 @@ def chat():
         max_tokens=request.json.get("max_tokens", 1000),
         messages=messages,
     )
+
+    response_dict = response if isinstance(response, dict) else response.__dict__
+
+    from jens_jugs.rule_executor import apply_rules
+
+    # If GPT output contains 'triggered_rules', apply them
+    triggered_rules = response_dict.get("triggered_rules", [])
+    if triggered_rules:
+        state, logs = apply_rules(state, triggered_rules)
+        print("[RuleExecutor] Applied rules:", logs)
+
     return jsonify({"response": response.choices[0].message.content})
 
 

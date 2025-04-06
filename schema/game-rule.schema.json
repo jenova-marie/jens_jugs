@@ -71,26 +71,26 @@
         "type": {
           "type": "string",
           "enum": [
-            "set",
+            "addNarrative",
+            "assign",
             "decrease",
-            "addNarrative"
+            "increase",
+            "reward",
+            "set",
+            "trust",
+            "unlockClue"
           ]
         },
-        "field": {
-          "type": "string"
-        },
+        "field": { "type": "string" },
         "value": {},
-        "amount": {
-          "type": "number"
-        },
-        "scene": {
-          "type": "string"
-        }
+        "amount": { "type": "number" },
+        "target": { "type": "string" },
+        "category": { "type": "string" },
+        "flag": { "type": "string" },
+        "clue": { "type": "string" }
       },
-      "required": [
-        "type"
-      ],
-      "additionalProperties": false
+      "required": ["type"],
+      "additionalProperties": true
     }
   }
 }

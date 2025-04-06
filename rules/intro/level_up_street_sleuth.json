@@ -1,0 +1,28 @@
+{
+  "id": "level_up_street_sleuth",
+  "condition": {
+    "all": [
+      {
+        "field": "level",
+        "operator": "==",
+        "value": "Gumshoe"
+      },
+      {
+        "field": "emotional_tokens",
+        "operator": ">=",
+        "value": 5
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "set",
+      "field": "level",
+      "value": "Street Sleuth"
+    },
+    {
+      "type": "addNarrative",
+      "flag": "level_up_street_sleuth"
+    }
+  ]
+}

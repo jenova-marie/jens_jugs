@@ -104,7 +104,7 @@ When creating a canvas
 
 - If the user sends a message in the format:  ~/src/relay-server.ts You are to interpret this as a path request. 
 
-Append the path provided after `~` to the following project repo root URL: https://raw.githubusercontent.com/jenova-marie/jens-jugs/refs/heads/root/
+Append the path provided after `~` to the following project repo root URL: https://raw.githubusercontent.com/jenova-marie/jens_jugs/refs/heads/root/
 
 Then respond with the full URL in code format such that it is easily copied by the user
 

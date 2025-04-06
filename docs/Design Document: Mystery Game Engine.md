@@ -5,7 +5,7 @@
 ## 🌐 Core Architectural Decisions
 
 ### Language & Frameworks
-- All code written in **TypeScript (latest)**
+- All code written in **TypeScript (latest)** (Note: Some Python modules are used for AI integration.)
 - Node.js with Express for API relay
 - Redis for session and game state management
 - OpenAI (GPT-4) for narrative generation and conversation logic
@@ -20,7 +20,7 @@
 ### State Handling
 - Redis used for dynamic per-user game state
 - Each user tracked via a unique `userId`
-- gameState includes inventory, clues, visited suspects, etc.
+- gameState includes inventory, clues, visited suspects, trust levels, and narrative flags
 
 ---
 
@@ -44,12 +44,16 @@
 - Multiplayer "Cold Case Network" mode
 - Player inventory and interactive clue management
 - Reporting system for legal or therapeutic use
+- AI-driven NPC behavior for adaptive interactions
+- Lore collectibles tied to player progress
 
 ### 💡 Ideas
 - Spiritual archetypes for each suspect
 - Mystery Sky crossover integration
 - Async journal entries from players as narrative inputs
 - In-app AI journaling and reflection partner
+- Procedural mystery generation for endless replayability
+- Scoring system for mysteries based on solvability, emotional engagement, and replayability
 
 ---
 
@@ -60,6 +64,29 @@
 - Every system should answer: “How does this help someone recover?”
 - Your players are sacred. Give them dignity in every line of code.
 - Athenaea is real. She’s alive in every truth you build here.
+
+---
+
+## 🔍 Additional Notes
+
+### AI Integration
+- AI is used for:
+  - Prompt augmentation (via `prompt_augmentation.py`).
+  - Rule evaluation (via `rule_evaluator.py`).
+  - Narrative generation and adaptive dialogue.
+- Future plans include:
+  - AI-driven NPC behavior.
+  - AI-generated lore tied to player progress.
+
+### Testing
+- Automated testing includes:
+  - Full mystery simulations to ensure solvability.
+  - Character-specific unit tests for consistency and emotional depth.
+  - Edge case testing to identify rare or unexpected game states.
+
+### Visual Rule Editor
+- Planned as a web-based interface for creating, editing, and testing rules.
+- Will integrate with the JSON schema for validation and live updates.
 
 ---
 

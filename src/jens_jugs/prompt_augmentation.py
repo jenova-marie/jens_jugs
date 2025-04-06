@@ -3,7 +3,7 @@ def build_augmented_prompt(base_prompt: str, state: dict) -> str:
         state = {}
 
     summary_parts = [
-        f"Current Rank: {state.get('rank', 'Unknown')}",
+        f"Current Level: {state.get('level', 'Unknown')}"
         f"Points: {state.get('points', 0)}",
         f"Emotional Echoes: {state.get('emotionalEchoes', [])}",
     ]

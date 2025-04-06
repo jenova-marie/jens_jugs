@@ -66,7 +66,7 @@ Each rank unlocks:
 {
   "caseName": "The Velvet Lily - Beginner",
   "score": 740,
-  "rank": "Rookie Detective",
+  "level": "Street Sleuth",
   "accuracy": 88,
   "mistakes": 2,
   "secretsUnlocked": 4,
