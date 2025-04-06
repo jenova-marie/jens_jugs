@@ -27,7 +27,7 @@ def cli(ctx, local_env):
     load_dotenv()
 
 @cli.command()
-@click.option("--secret", default="RecoverySky/Core/Prod", help="AWS Secrets Manager secret name.")
+@click.option("--secret", default="JensJugs/Api/Local/Dev", help="AWS Secrets Manager secret name.")
 @click.pass_context
 def start(ctx, secret):
     """Start the relay server."""

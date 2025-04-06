@@ -3,13 +3,12 @@ from flask import Flask, request, jsonify
 from prompt_augmentation import build_augmented_prompt
 from redis_gamestate import get_or_create_game_state, set_game_state
 from rule_evaluator import run_game_rules
+from cloudwatch_logger import get_logger
 from openai import OpenAI
-from dotenv import load_dotenv
 import os
 
-# Load environment variables from .env file
-load_dotenv()
-
+logger = get_logger(log_name="relay_server")
+logger.info("Starting the relay server...")
 # Retrieve the OpenAI API key from the environment
 openai_api_key = os.getenv("OPENAPI_KEY")
 if not openai_api_key:
@@ -57,6 +56,5 @@ def chat():
 
     return jsonify({"response": response.choices[0].message.content})
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
