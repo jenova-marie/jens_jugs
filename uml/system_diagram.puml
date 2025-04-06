@@ -1,0 +1,66 @@
+@startuml
+left to right direction
+
+actor Player
+
+rectangle "Client App" as App {
+    [UI]
+    [API Requests]
+}
+
+rectangle "Relay Server" as Relay {
+    [Flask API]
+    [OpenAI Integration]
+    [Game State Management]
+    [Rule Evaluation]
+}
+
+rectangle "Game Logic Engine" as Logic {
+    [Rule Evaluator]
+    [Rule Executor]
+    [Game Logic Injection]
+}
+
+database "Game State (Redis)" as State {
+    [Player State]
+    [Narrative Flags]
+    [Inventory]
+}
+
+folder "Rule Store (JSON)" as Rules {
+    [Rule Definitions]
+    [Schemas]
+}
+
+rectangle "Prompt Augmentation" as Prompt {
+    [Dynamic Prompt Builder]
+    [Game State Summary]
+}
+
+rectangle "OpenAI API" as OpenAI {
+    [Chat Completions]
+    [Narrative Generation]
+}
+
+folder "Testing Suite" as Tests {
+    [Unit Tests]
+    [AI Simulations]
+    [Rule Validation]
+}
+
+Player --> App : Interacts with UI
+App --> Relay : Sends API Requests
+Relay --> State : Reads/Writes Game State
+Relay --> Rules : Loads Rule Definitions
+Relay --> Logic : Evaluates Rules
+Logic --> State : Updates Game State
+Logic --> Rules : Validates Rules
+Relay --> Prompt : Augments Prompt with State
+Relay --> OpenAI : Sends Chat Completion Request
+OpenAI --> Relay : Returns AI Response
+Relay --> App : Sends Response to Player
+Tests --> Relay : Simulates API Calls
+Tests --> Logic : Validates Rule Execution
+Tests --> State : Tests Game State Persistence
+
+@enduml
