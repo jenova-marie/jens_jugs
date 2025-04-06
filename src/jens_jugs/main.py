@@ -5,6 +5,14 @@ import os
 import json
 from dotenv import load_dotenv
 import boto3
+import sys
+from jens_jugs.relay_server import create_app
+from jens_jugs.prompt_augmentation import build_augmented_prompt
+import jens_jugs.redis_gamestate as redis_gamestate
+from jens_jugs.jwt_auth import jwt_verify  # Import jwt_verify
+from jens_jugs.auth_service import auth_bp  # Import auth_bp
+from jens_jugs.rule_evaluator import run_game_rules  # Import run_game_rules
+from jens_jugs.cloudwatch_logger import get_logger  # Import get_logger
 
 def get_aws_secret_manager_value(secret_name):
     """Retrieve a secret value from AWS Secrets Manager."""
@@ -14,6 +22,14 @@ def get_aws_secret_manager_value(secret_name):
         return response["SecretString"]
     except Exception as e:
         raise RuntimeError(f"Failed to retrieve secret: {e}")
+
+def log_uncaught_exceptions(exc_type, exc_value, exc_traceback):
+    """Log uncaught exceptions to CloudWatch."""
+    logger = get_logger(log_name="global")
+    logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+# Set the global exception handler
+sys.excepthook = log_uncaught_exceptions
 
 @click.group()
 @click.option("--local-env", is_flag=True, help="Use local environment variables.")
@@ -60,13 +76,20 @@ def start(ctx, secret, log_reset, debug):
     # Pass the debug flag to the relay server
     os.environ["DEBUG_MODE"] = str(debug)
 
-    relay_path = Path(__file__).parent / "relay_server.py"
-    if not relay_path.exists():
-        click.echo(f"❌ relay_server.py not found at {relay_path}")
-        raise click.ClickException("File not found")
+    # Create the Flask app with dependencies
+    app = create_app(
+        jwt_verify=jwt_verify,
+        auth_bp=auth_bp,
+        run_game_rules=run_game_rules,
+        get_logger=get_logger,
+        build_prompt=build_augmented_prompt,
+        redis_gamestate=redis_gamestate,
+    )
 
-    click.echo("🚀 Starting relay server...")
-    subprocess.run(["python", str(relay_path)], check=True)
+    # Start the Flask app
+    port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set
+    click.echo(f"🚀 Starting relay server on port {port}...")
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False)
 
 if __name__ == "__main__":
     cli()

@@ -1,6 +1,6 @@
 import logging
 from watchtower import CloudWatchLogHandler
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import boto3
 from botocore.exceptions import ClientError
@@ -8,11 +8,13 @@ from botocore.exceptions import ClientError
 class CloudWatchLogger:
     def __init__(self, log_group_name, log_stream_name, level=logging.INFO):
         self.log_group_name = log_group_name
-        self.log_stream_name = log_stream_name
-        # Set the log level based on debug_mode
+        self.base_log_stream_name = log_stream_name  # Base name without the date
+        self.log_stream_name = self._generate_stream_name()
         self.debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
         self.level = logging.DEBUG if self.debug_mode else level
         self.logger = None
+        self.stream_creation_date = datetime.now()  # Track when the stream was created
+        self.stream_duration = int(os.getenv("CLOUDWATCH_STREAM_DURATION", 7))  # Default to 7 days
 
     def setup_logger(self, reset_log_stream=False):
         if self.logger:
@@ -70,11 +72,30 @@ class CloudWatchLogger:
         original_emit = handler.emit
 
         def emit_and_flush(record):
+            self._check_stream_age()  # Check if the stream needs to be rotated
             original_emit(record)
             handler.flush()
 
         handler.emit = emit_and_flush
         print("[CloudWatchLogger] Immediate flush enabled for CloudWatchLogHandler.")
+
+    def _check_stream_age(self):
+        """Check if the current log stream has exceeded its duration and rotate if necessary."""
+        current_time = datetime.now()
+        if (current_time - self.stream_creation_date).days >= self.stream_duration:
+            print("[CloudWatchLogger] Log stream duration exceeded. Rotating log stream...")
+            self._rotate_log_stream()
+
+    def _rotate_log_stream(self):
+        """Rotate the log stream by creating a new one."""
+        self.log_stream_name = self._generate_stream_name()
+        self.stream_creation_date = datetime.now()
+        print(f"[CloudWatchLogger] Rotated to new log stream: {self.log_stream_name}")
+
+    def _generate_stream_name(self):
+        """Generate a log stream name with the current date."""
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        return f"{self.base_log_stream_name}-{current_date}"
 
     def _delete_log_stream(self):
         """Delete the log stream if it exists."""
@@ -95,23 +116,16 @@ class CloudWatchLogger:
 
 # Usage example
 def get_logger(log_name="default"):
-    # Retrieve the reset_log_stream value from the LOG_RESET environment variable
+    """Retrieve or create a logger."""
     reset_log_stream = os.getenv("LOG_RESET", "False").lower() == "true"
-    print(f"[CloudWatchLogger] reset_log_stream: {reset_log_stream}")
-
-    # Retrieve the environment name from APP_ENV
     app_env = os.getenv("APP_ENV", "Unknown")
     if app_env == "Unknown":
         print("[CloudWatchLogger] Warning: APP_ENV is not set. Defaulting to 'Unknown'.")
         logging.warning("APP_ENV is not set. Defaulting to 'Unknown'.")
 
     app_env = "Dev" if app_env.lower() == "development" else "Prod"
-
-    # Construct the log group name
     log_group_name = f"{os.getenv('CLOUDWATCH_GROUP_NAME', 'JensJugs/Api')}/{app_env}"
-    log_stream_name = log_name  # Removed the timestamp from the stream name
-
-    print(f"[CloudWatchLogger] Log group: {log_group_name}, Log stream: {log_stream_name}")
+    log_stream_name = log_name
 
     logger = CloudWatchLogger(
         log_group_name=log_group_name,

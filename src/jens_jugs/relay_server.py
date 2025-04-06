@@ -1,67 +1,115 @@
 # Purpose: Acts as the API gateway between the client app and OpenAI
 from flask import Flask, request, jsonify
-from prompt_augmentation import build_augmented_prompt
-from redis_gamestate import get_or_create_game_state, set_game_state
-from rule_evaluator import run_game_rules
-from cloudwatch_logger import get_logger
-from openai import OpenAI
-from jwt_auth import jwt_verify  # Import the extracted jwt_verify function
-from auth_service import auth_bp  # Import the auth blueprint
+from openai import OpenAI, OpenAIError
 import os
 
-logger = get_logger(log_name="relay_server")
-logger.info("Starting the relay server...")
+def create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, redis_gamestate):
+    logger = get_logger(log_name="relay_server")
+    logger.info("Starting the relay server...")
 
-# Retrieve the OpenAI API key from the environment
-openai_api_key = os.getenv("OPENAPI_KEY")
-if not openai_api_key:
-    raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
+    # Retrieve the OpenAI API key from the environment
+    openai_api_key = os.getenv("OPENAPI_KEY")
+    if not openai_api_key:
+        logger.critical("OPENAPI_KEY is not set in the environment variables.")
+        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
 
-app = Flask(__name__)
-app.register_blueprint(auth_bp)  # Register the auth blueprint here
-client = OpenAI(api_key=openai_api_key)
+    app = Flask(__name__)
+    app.register_blueprint(auth_bp)  # Register the auth blueprint here
+    client = OpenAI(api_key=openai_api_key)
 
-@app.route("/api/chat", methods=["POST"])
-@jwt_verify
-def chat():
-    user_id = request.json.get("userId")
-    if not user_id:
-        return jsonify({"error": "Missing userId"}), 400
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Log all exceptions to CloudWatch."""
+        logger.error(f"Unhandled exception occurred: {e}", exc_info=True)
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
-    messages = request.json.get("messages")
-    if not messages:
-        return jsonify({"error": "Missing messages"}), 400
+    @app.route("/api/chat", methods=["POST"])
+    @jwt_verify
+    def chat():
+        logger.info("Received request at /api/chat endpoint.")
+        try:
+            # Parse JSON request body
+            request_data = request.get_json()
+            if not request_data:
+                logger.warning("Request body is empty or not valid JSON.")
+                return jsonify({"error": "Request body must be valid JSON"}), 400
 
-    rules = request.json.get("rules", [])
-    game_state = get_or_create_game_state(user_id)
-    game_state = run_game_rules(game_state, rules)
-    set_game_state(user_id, game_state)
+            # Extract userId
+            user_id = request_data.get("userId")
+            if not user_id:
+                logger.warning("Missing userId in request body.")
+                return jsonify({"error": "Missing userId"}), 400
+            logger.debug(f"Extracted userId: {user_id}")
 
-    if messages[0]["role"] == "system":
-        messages[0]["content"] = build_augmented_prompt(
-            messages[0]["content"], game_state
-        )
+            # Extract messages
+            messages = request_data.get("messages")
+            if not messages:
+                logger.warning("Missing messages in request body.")
+                return jsonify({"error": "Missing messages"}), 400
+            logger.debug(f"Extracted messages: {messages}")
 
-    response = client.chat.completions.create(
-        model=request.json.get("model", "gpt-4"),
-        temperature=request.json.get("temperature", 0.7),
-        max_tokens=request.json.get("max_tokens", 1000),
-        messages=messages,
-    )
+            # Extract rules
+            rules = request_data.get("rules", [])
+            logger.debug(f"Extracted rules: {rules}")
 
-    response_dict = response if isinstance(response, dict) else response.__dict__
+            # Retrieve and update game state
+            logger.info(f"Retrieving game state for userId: {user_id}")
+            game_state = redis_gamestate.get_or_create_game_state(user_id)
+            logger.debug(f"Initial game state: {game_state}")
 
-    from jens_jugs.rule_executor import apply_rules
+            game_state = run_game_rules(game_state, rules)
+            logger.debug(f"Updated game state after applying rules: {game_state}")
 
-    # If GPT output contains 'triggered_rules', apply them
-    triggered_rules = response_dict.get("triggered_rules", [])
-    if triggered_rules:
-        state, logs = apply_rules(state, triggered_rules)
-        print("[RuleExecutor] Applied rules:", logs)
+            redis_gamestate.set_game_state(user_id, game_state)
+            logger.info(f"Game state updated for userId: {user_id}")
 
-    return jsonify({"response": response.choices[0].message.content})
+            # Augment system message if applicable
+            if messages[0]["role"] == "system":
+                logger.info("Augmenting system message with game state.")
+                try:
+                    messages[0]["content"] = build_prompt(
+                        messages[0]["content"], game_state
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to augment system message: {e}")
+                    return jsonify({"error": "Failed to augment system message"}), 500
+                logger.debug(f"Augmented system message: {messages[0]['content']}")
+
+            # Call OpenAI API
+            logger.info("Sending request to OpenAI API.")
+            response = client.chat.completions.create(
+                model=request_data.get("model", "gpt-4"),
+                temperature=request_data.get("temperature", 0.7),
+                max_tokens=request_data.get("max_tokens", 1000),
+                messages=messages,
+            )
+            logger.info("Received response from OpenAI API.")
+
+            # Extract response content
+            response_content = response.choices[0].message.content
+            logger.debug(f"OpenAI response content: {response_content}")
+
+            # Check for triggered rules in the response metadata
+            triggered_rules = getattr(response, "triggered_rules", [])
+            if triggered_rules:
+                logger.info(f"Applying triggered rules: {triggered_rules}")
+                state, logs = apply_rules(game_state, triggered_rules)
+                logger.info(f"Triggered rules applied. Logs: {logs}")
+
+            return jsonify({"response": response_content})
+
+        except OpenAIError as e:
+            logger.error(f"OpenAI API error: {e}", exc_info=True)
+            return jsonify({"error": "Error communicating with OpenAI API"}), 500
+        except Exception as e:
+            logger.error(f"Unexpected error processing /api/chat request: {e}", exc_info=True)
+            return jsonify({"error": "Unexpected error occurred"}), 500
+
+    return app
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set
-    print(f"Starting Flask app on port {port}...")
+    logger = get_logger(log_name="relay_server")
+    logger.info(f"Starting Flask app on port {port}...")
+    app = create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, redis_gamestate)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

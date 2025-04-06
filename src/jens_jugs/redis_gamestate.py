@@ -4,7 +4,12 @@ import redis
 import json
 import os
 
-r = redis.Redis(host="localhost", port=6379, db=0)
+# Retrieve Redis host and port from environment variables
+redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
+redis_port = int(os.getenv("REDIS_PORT", 6379))    # Default to 6379
+
+# Initialize Redis client
+r = redis.Redis(host=redis_host, port=redis_port, db=0)
 
 # Load default game state from file
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

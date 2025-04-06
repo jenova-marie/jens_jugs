@@ -13,14 +13,27 @@ from cloudwatch_logger import get_logger
 logger = get_logger(log_name="auth_service")
 
 # Connect to Redis
-redis_client = redis.StrictRedis(host="localhost", port=6379, decode_responses=True)
+redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
+redis_port = int(os.getenv("REDIS_PORT", 6379))    # Default to 6379
+redis_client = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
+logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
 
 # JWT algorithm
-JWT_ALGORITHM = "RS256"
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "RS256")  # Retrieve from environment or default to "RS256"
+
+# Retrieve durations from environment variables
+JWK_DURATION = int(os.getenv("JWK_DURATION", 86400))  # Default to 1 day (86400 seconds)
+JWT_DURATION = int(os.getenv("JWT_DURATION", 3600))   # Default to 1 hour (3600 seconds)
+
+# Retrieve public exponent and key size from environment variables
+JWK_PUBLIC_EXPONENT = int(os.getenv("JWK_PUBLIC_EXPONENT", 65537))  # Default to 65537
+JWK_KEY_SIZE = int(os.getenv("JWK_KEY_SIZE", 2048))  # Default to 2048
 
 # Validate the active key
+logger.info("Validating the active key in Redis.")
 active_kid = redis_client.get("active_kid")
 if active_kid:
+    logger.debug(f"Found active_kid: {active_kid} in Redis.")
     # Fetch the key pair and expiration time
     key_data = redis_client.hgetall(f"jwks:{active_kid}")
     private_key_pem = key_data.get("private_key")
@@ -28,6 +41,7 @@ if active_kid:
     exp_at = key_data.get("exp_at")
 
     if private_key_pem and public_key_pem and exp_at:
+        logger.debug(f"Key pair for active_kid: {active_kid} retrieved from Redis.")
         # Check if the key has expired
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
         if current_timestamp >= int(exp_at):
@@ -43,11 +57,13 @@ else:
 
 # If no valid key pair exists, generate a new one
 if not active_kid:
+    logger.info("Generating a new RSA key pair.")
     # Generate RSA private key
     private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
+        public_exponent=JWK_PUBLIC_EXPONENT,
+        key_size=JWK_KEY_SIZE,
     )
+    logger.debug(f"Generated RSA private key with public_exponent={JWK_PUBLIC_EXPONENT} and key_size={JWK_KEY_SIZE}.")
 
     # Export private key
     private_key_pem = private_key.private_bytes(
@@ -55,6 +71,7 @@ if not active_kid:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
+    logger.debug("Exported private key in PEM format.")
 
     # Export public key
     public_key = private_key.public_key()
@@ -62,15 +79,17 @@ if not active_kid:
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode("utf-8")
+    logger.debug("Exported public key in PEM format.")
 
     # Increment the Key ID
     active_kid = redis_client.get("active_kid")
     new_kid = str(int(active_kid) + 1) if active_kid else "1"
+    logger.info(f"New key ID generated: {new_kid}.")
 
     # Define the expiration duration for the key pair
-    key_expiration_duration = timedelta(days=1)  # Set expiration to 1 day (adjust as needed)
-    expiration_time = datetime.now(tz=timezone.utc) + key_expiration_duration
+    expiration_time = datetime.now(tz=timezone.utc) + timedelta(seconds=JWK_DURATION)
     expiration_timestamp = int(expiration_time.timestamp())  # Convert to UTC timestamp
+    logger.debug(f"Key expiration set to {expiration_timestamp} (UTC).")
 
     # Store the new keys in Redis with an expiration timestamp
     redis_client.hset(f"jwks:{new_kid}", mapping={
@@ -85,9 +104,11 @@ else:
 
 # Convert public key to JWK format
 def public_key_to_jwk(public_key):
+    logger.debug("Converting public key to JWK format.")
     numbers = public_key.public_numbers()
     e = base64.urlsafe_b64encode(numbers.e.to_bytes(3, "big")).decode("utf-8").rstrip("=")
     n = base64.urlsafe_b64encode(numbers.n.to_bytes((numbers.n.bit_length() + 7) // 8, "big")).decode("utf-8").rstrip("=")
+    logger.debug(f"Converted public key to JWK with e={e} and n={n}.")
     return {
         "kty": "RSA",
         "use": "sig",
@@ -109,7 +130,6 @@ def generate_jwt():
         return jsonify({"error": "Missing userId"}), 400
 
     # Fetch the active private key from Redis
-    redis_client = redis.StrictRedis(host="localhost", port=6379, decode_responses=True)
     active_kid = redis_client.get("active_kid")
     if not active_kid:
         logger.error("No active_kid found in Redis.")
@@ -124,7 +144,7 @@ def generate_jwt():
     private_key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
 
     # Generate JWT token
-    expiration = datetime.utcnow() + timedelta(hours=1)
+    expiration = datetime.utcnow() + timedelta(seconds=JWT_DURATION)
     payload = {
         "userId": user_id,
         "exp": expiration,
@@ -143,8 +163,12 @@ def generate_jwt():
 def jwks():
     logger.info("Received request for /.well-known/jwks.json endpoint.")
     try:
-        # Connect to Redis
-        redis_client = redis.StrictRedis(host="localhost", port=6379, decode_responses=True)
+        # Connect to Redis using environment variables
+        redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
+        redis_port = int(os.getenv("REDIS_PORT", 6379))    # Default to 6379
+        redis_client = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
+        logger.debug(f"Connected to Redis at {redis_host}:{redis_port}")
+
         keys = []
 
         # Fetch all JWKs from Redis
