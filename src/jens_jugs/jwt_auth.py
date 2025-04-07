@@ -3,7 +3,7 @@ from jose import jwt, jwk
 from datetime import datetime, timezone
 import requests
 import os
-from cloudwatch_logger import get_logger
+from jens_jugs.cloudwatch_logger import get_logger
 
 logger = get_logger(log_name="jwt_auth")
 

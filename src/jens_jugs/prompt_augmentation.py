@@ -1,4 +1,4 @@
-def build_augmented_prompt(base_prompt: str, state: dict) -> str:
+def build_prompt(base_prompt: str, state: dict) -> str:
     if state is None:
         state = {}
 

@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 import json
 import base64
 import redis
-from cloudwatch_logger import get_logger
+from jens_jugs.cloudwatch_logger import get_logger
 
 # Initialize logger
 logger = get_logger(log_name="auth_service")
@@ -121,9 +121,22 @@ def public_key_to_jwk(public_key):
 # Create a Flask Blueprint for the auth service
 auth_bp = Blueprint("auth", __name__)
 
+"""Protected endpoint for authentication."""
 @auth_bp.route("/api/auth", methods=["POST"])
 def generate_jwt():
     logger.debug("Received request for /api/auth endpoint.")
+
+    # Retrieve the Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # Extract the token from the header
+    token = auth_header.split(" ")[1]
+    if token != os.environ.get("API_AUTH_KEY"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+
     user_id = request.json.get("userId")
     if not user_id:
         logger.warning("Missing userId in request body.")

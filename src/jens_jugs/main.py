@@ -3,16 +3,19 @@ import subprocess
 from pathlib import Path
 import os
 import json
+import redis
 from dotenv import load_dotenv
 import boto3
 import sys
 from jens_jugs.relay_server import create_app
-from jens_jugs.prompt_augmentation import build_augmented_prompt
+from jens_jugs.prompt_augmentation import build_prompt
 import jens_jugs.redis_gamestate as redis_gamestate
-from jens_jugs.jwt_auth import jwt_verify  # Import jwt_verify
-from jens_jugs.auth_service import auth_bp  # Import auth_bp
-from jens_jugs.rule_evaluator import run_game_rules  # Import run_game_rules
-from jens_jugs.cloudwatch_logger import get_logger  # Import get_logger
+from jens_jugs.jwt_auth import jwt_verify
+from jens_jugs.auth_service import auth_bp
+from jens_jugs.rule_evaluator import run_game_rules
+from jens_jugs.cloudwatch_logger import get_logger
+from jens_jugs.sys_init import populate_redis_with_defaults
+from openai import OpenAI
 
 def get_aws_secret_manager_value(secret_name):
     """Retrieve a secret value from AWS Secrets Manager."""
@@ -76,14 +79,33 @@ def start(ctx, secret, log_reset, debug):
     # Pass the debug flag to the relay server
     os.environ["DEBUG_MODE"] = str(debug)
 
+    # Create required logger
+    logger = get_logger(log_name="main")
+    logger.info("Populating Redis with default values...")
+
+    # Initialize Redis and populate defaults
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = int(os.getenv("REDIS_PORT", 6379))
+    redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+
+    # POpulate Redis with default or updated data if required
+    populate_redis_with_defaults(redis_client, logger)
+
     # Create the Flask app with dependencies
+    openai_api_key = os.getenv("OPENAPI_KEY")
+    if not openai_api_key:
+        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
+
+    openai_client = OpenAI(api_key=openai_api_key)
+
     app = create_app(
         jwt_verify=jwt_verify,
         auth_bp=auth_bp,
         run_game_rules=run_game_rules,
         get_logger=get_logger,
-        build_prompt=build_augmented_prompt,
+        build_prompt=build_prompt,
         redis_gamestate=redis_gamestate,
+        openai_client=openai_client,
     )
 
     # Start the Flask app
