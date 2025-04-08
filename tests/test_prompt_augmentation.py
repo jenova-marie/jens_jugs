@@ -1,4 +1,7 @@
 import unittest
+import pytest
+from unittest.mock import patch
+from src.jens_jugs.prompt_augmentation import augment_prompt
 from jens_jugs.prompt_augmentation import build_prompt
 from tests.test_base import BaseTestCase
 
@@ -91,6 +94,14 @@ class TestPromptAugmentation(BaseTestCase):
         self.assertIn(base_prompt, result)
         self.assertIn("[Game State Summary]", result)
         self.assertIn(expected_events, result)
+
+    @patch("jens_jugs.prompt_augmentation.get_logger")
+    def test_augment_prompt(self, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
+        prompt = "What is the capital of France?"
+        context = {"country": "France"}
+        result = augment_prompt(prompt, context)
+        assert "Paris" in result  # Example assertion
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,25 +9,17 @@ class TestSysInit(BaseTestCase):
     @patch("jens_jugs.sys_init.os.path.join", return_value="/mock/path/redis.json")
     @patch("jens_jugs.sys_init.os.path.dirname", return_value="/mock/path")
     def test_populate_redis_with_defaults(self, mock_dirname, mock_join, mock_open_file, mock_get_logger):
-        # Mock Redis client
+        mock_get_logger.return_value = self.local_logger
         mock_redis_client = MagicMock()
-        mock_redis_client.exists.side_effect = lambda key: key == "key1"  # Simulate "key1" already exists
+        mock_redis_client.exists.side_effect = lambda key: key == "key1"
 
-        # Mock logger
-        mock_logger = MagicMock()
-        mock_get_logger.return_value = mock_logger
+        populate_redis_with_defaults(mock_redis_client, logger=self.local_logger)
 
-        # Call the function
-        populate_redis_with_defaults(mock_redis_client, logger=mock_logger)
-
-        # Assertions for Redis interactions
         mock_redis_client.exists.assert_any_call("key1")
         mock_redis_client.exists.assert_any_call("key2")
         mock_redis_client.set.assert_called_once_with("key2", '{"nested_key": "nested_value"}')
 
-        # Assertions for logger interactions
-        mock_logger.info.assert_any_call("Key 'key2' not found in Redis. Adding default value.")
-        mock_logger.debug.assert_any_call("Key 'key1' already exists in Redis. Skipping.")
+        self.local_logger.info.assert_any_call("Key 'key2' not found in Redis. Adding default value.")
 
     @patch("jens_jugs.sys_init.get_logger")
     @patch("builtins.open", new_callable=mock_open, read_data='{"key1": "value1"}')

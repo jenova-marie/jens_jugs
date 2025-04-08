@@ -1,7 +1,7 @@
 # Purpose: Acts as the API gateway between the client app and OpenAI
 import os
 from flask import Flask, request, jsonify
-from openai import OpenAIError
+from openai import OpenAI, OpenAIError
 
 # Additional imports for operation
 from jens_jugs.jwt_auth import jwt_verify  # For JWT verification
@@ -14,7 +14,7 @@ from jens_jugs.prompt_augmentation import build_prompt  # For augmenting system 
 from jens_jugs.sys_init import populate_redis_with_defaults  # For initializing system defaults in Redis
 import logging  # For configuring Werkzeug logger
 
-def create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, redis_gamestate, openai_client):
+def create_app():
     # Initialize the logger
     logger = get_logger(log_name="relay_server", streams=["console", "cloudwatch", "file"], config={
                     "file": {
@@ -24,6 +24,13 @@ def create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, re
                     }
                 })
     logger.info("Starting the relay server...")
+
+    # Create the OpenAI client
+    openai_api_key = os.getenv("OPENAPI_KEY")
+    if not openai_api_key:
+        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
+
+    openai_client = OpenAI(api_key=openai_api_key)
 
     # Configure Werkzeug to use the same logger
     werkzeug_logger = logging.getLogger("werkzeug")

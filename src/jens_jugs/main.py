@@ -8,14 +8,8 @@ from dotenv import load_dotenv
 import boto3
 import sys
 from jens_jugs.relay_server import create_app
-from jens_jugs.prompt_augmentation import build_prompt
-import jens_jugs.redis_gamestate as redis_gamestate
-from jens_jugs.jwt_auth import jwt_verify
-from jens_jugs.auth_service import auth_bp
-from jens_jugs.rule_evaluator import run_game_rules
 from jens_jugs.logger import get_logger
 from jens_jugs.sys_init import populate_redis_with_defaults
-from openai import OpenAI
 
 logger = get_logger(log_name="main", streams=["console", "cloudwatch", "file"], config={
                     "file": {
@@ -97,23 +91,7 @@ def start(ctx, secret, log_reset, debug):
     # Populate Redis with default or updated data if required
     populate_redis_with_defaults(redis_client, logger)
 
-    # Create the OpenAI client if not provided
-    openai_api_key = os.getenv("OPENAPI_KEY")
-    if not openai_api_key:
-        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
-
-    print("openai_client = OpenAI(api_key=openai_api_key)")
-    openai_client = OpenAI(api_key=openai_api_key)
-
-    app = create_app(
-        jwt_verify=jwt_verify,
-        auth_bp=auth_bp,
-        run_game_rules=run_game_rules,
-        get_logger=get_logger,
-        build_prompt=build_prompt,
-        redis_gamestate=redis_gamestate,
-        openai_client=openai_client,
-    )
+    app = create_app()
 
     # Start the Flask app
     port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set
