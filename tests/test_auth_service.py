@@ -45,14 +45,13 @@ def generate_mock_public_key():
 
 class TestAuthService(BaseTestCase):
     def setUp(self):
-        super().setUp()
-        # Create a Flask app and register the auth Blueprint
+        super().setUp()  # Call BaseTestCase's setUp to initialize self.local_logger
         self.app = Flask(__name__)
         self.app.register_blueprint(auth_bp)
         self.client = self.app.test_client()
-
         self.bearer = os.environ.get("API_AUTH_KEY")
 
+    @patch("jens_jugs.auth_service.get_logger")
     @patch("jens_jugs.auth_service.redis_client")
     @patch("jens_jugs.auth_service.serialization.load_pem_private_key")
     @patch("jens_jugs.auth_service.jwt.encode")
@@ -61,7 +60,11 @@ class TestAuthService(BaseTestCase):
         mock_jwt_encode,
         mock_load_private_key,
         mock_redis_client,
+        mock_get_logger,
     ):
+        # Use self.local_logger from BaseTestCase
+        mock_get_logger.return_value = self.local_logger
+
         # Generate a mock private key
         mock_private_key = generate_mock_private_key()
 
@@ -90,7 +93,11 @@ class TestAuthService(BaseTestCase):
         self.assertIn("token", response.json)
         self.assertEqual(response.json["token"], "mock-jwt-token")
 
-    def test_missing_authorization_header(self):
+    @patch("jens_jugs.auth_service.get_logger")
+    def test_missing_authorization_header(self, mock_get_logger):
+        # Use self.local_logger from BaseTestCase
+        mock_get_logger.return_value = self.local_logger
+
         # Simulate a request without the Authorization header
         response = self.client.post(
             "/api/auth",
@@ -101,7 +108,11 @@ class TestAuthService(BaseTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json, {"error": "Unauthorized"})
 
-    def test_invalid_authorization_header(self):
+    @patch("jens_jugs.auth_service.get_logger")
+    def test_invalid_authorization_header(self, mock_get_logger):
+        # Use self.local_logger from BaseTestCase
+        mock_get_logger.return_value = self.local_logger
+
         # Simulate a request with an invalid Authorization header
         response = self.client.post(
             "/api/auth",
@@ -113,7 +124,9 @@ class TestAuthService(BaseTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json, {"error": "Unauthorized"})
 
-    def test_missing_user_id(self):
+    @patch("jens_jugs.auth_service.get_logger")
+    def test_missing_user_id(self, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
         # Simulate a request without the userId in the JSON payload
         response = self.client.post(
             "/api/auth",
@@ -125,8 +138,10 @@ class TestAuthService(BaseTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json, {"error": "Missing userId"})
 
+    @patch("jens_jugs.auth_service.get_logger")
     @patch("jens_jugs.auth_service.redis_client")
-    def test_missing_active_kid_in_redis(self, mock_redis_client):
+    def test_missing_active_kid_in_redis(self, mock_redis_client, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
         # Mock Redis to return None for active_kid
         mock_redis_client.get.return_value = None
 
@@ -142,8 +157,10 @@ class TestAuthService(BaseTestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json, {"error": "Failed to retrieve active_kid from Redis"})
 
+    @patch("jens_jugs.auth_service.get_logger")
     @patch("jens_jugs.auth_service.redis_client")
-    def test_missing_private_key_in_redis(self, mock_redis_client):
+    def test_missing_private_key_in_redis(self, mock_redis_client, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
         # Mock Redis to return None for the private key
         mock_redis_client.get.return_value = "1"
         mock_redis_client.hget.return_value = None
@@ -159,8 +176,10 @@ class TestAuthService(BaseTestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json, {"error": "Failed to retrieve private key from Redis"})
 
+    @patch("jens_jugs.auth_service.get_logger")
     @patch("jens_jugs.auth_service.redis_client")
-    def test_valid_jwks_retrieval(self, mock_redis_client):
+    def test_valid_jwks_retrieval(self, mock_redis_client, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
         # Generate a mock public key
         mock_public_key = generate_mock_public_key()
 
@@ -179,8 +198,10 @@ class TestAuthService(BaseTestCase):
         self.assertIn("n", response.json["keys"][0])
         self.assertIn("e", response.json["keys"][0])
 
+    @patch("jens_jugs.auth_service.get_logger")
     @patch("jens_jugs.auth_service.redis_client")
-    def test_no_jwks_in_redis(self, mock_redis_client):
+    def test_no_jwks_in_redis(self, mock_redis_client, mock_get_logger):
+        mock_get_logger.return_value = self.local_logger
         # Mock Redis to return no keys
         mock_redis_client.scan_iter.return_value = []
 

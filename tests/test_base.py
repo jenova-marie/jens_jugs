@@ -13,7 +13,7 @@ class BaseTestCase(unittest.TestCase):
         os.environ["LOG_STREAM"] = "test_logger_stream"
         os.environ["DEBUG_MODE"] = "True"
         os.environ["CLOUDWATCH_STREAM_DURATION"] = "7"
-        os.environ["LOG_RESET"] = "True"
+        os.environ["LOG_RESET"] = "False"
         os.environ["AWS_REGION"] = "us-east-1"
         os.environ["OPENAPI_KEY"] = "abc123"
         os.environ["API_PORT_HTTP"] = "6000"  # Set to "local" for local-only logging
