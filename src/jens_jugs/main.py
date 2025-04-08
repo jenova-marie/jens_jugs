@@ -13,9 +13,17 @@ import jens_jugs.redis_gamestate as redis_gamestate
 from jens_jugs.jwt_auth import jwt_verify
 from jens_jugs.auth_service import auth_bp
 from jens_jugs.rule_evaluator import run_game_rules
-from jens_jugs.cloudwatch_logger import get_logger
+from jens_jugs.logger import get_logger
 from jens_jugs.sys_init import populate_redis_with_defaults
 from openai import OpenAI
+
+logger = get_logger(log_name="main", streams=["console", "cloudwatch", "file"], config={
+                    "file": {
+                        "path": "./logs",
+                        "max_bytes": 10 * 1024 * 1024,  # 10 MB
+                        "backup_count": 5
+                    }
+                })
 
 def get_aws_secret_manager_value(secret_name):
     """Retrieve a secret value from AWS Secrets Manager."""
@@ -28,7 +36,6 @@ def get_aws_secret_manager_value(secret_name):
 
 def log_uncaught_exceptions(exc_type, exc_value, exc_traceback):
     """Log uncaught exceptions to CloudWatch."""
-    logger = get_logger(log_name="global")
     logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 # Set the global exception handler
@@ -80,7 +87,6 @@ def start(ctx, secret, log_reset, debug):
     os.environ["DEBUG_MODE"] = str(debug)
 
     # Create required logger
-    logger = get_logger(log_name="main")
     logger.info("Populating Redis with default values...")
 
     # Initialize Redis and populate defaults
@@ -88,14 +94,15 @@ def start(ctx, secret, log_reset, debug):
     redis_port = int(os.getenv("REDIS_PORT", 6379))
     redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
-    # POpulate Redis with default or updated data if required
+    # Populate Redis with default or updated data if required
     populate_redis_with_defaults(redis_client, logger)
 
-    # Create the Flask app with dependencies
+    # Create the OpenAI client if not provided
     openai_api_key = os.getenv("OPENAPI_KEY")
     if not openai_api_key:
         raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
 
+    print("openai_client = OpenAI(api_key=openai_api_key)")
     openai_client = OpenAI(api_key=openai_api_key)
 
     app = create_app(

@@ -1,22 +1,85 @@
 import unittest
-from unittest.mock import AsyncMock, patch
-import redis_gamestate
+from unittest.mock import MagicMock, patch
+from jens_jugs.redis_gamestate import load_default_gamestate, get_game_state, set_game_state
+from tests.test_base import BaseTestCase
 
-class TestRedisGameState(unittest.IsolatedAsyncioTestCase):
+class TestRedisGameState(BaseTestCase):
 
-    @patch("redis_gamestate.redis_client")
-    async def test_set_and_get_game_state(self, mock_redis):
-        mock_redis.get = AsyncMock(return_value=b'{"trust": 70}')
-        mock_redis.set = AsyncMock(return_value=True)
+    @patch("jens_jugs.redis_gamestate.json.loads")
+    @patch("jens_jugs.redis_gamestate.redis.Redis")
+    def test_load_default_gamestate_success(self, mock_redis, mock_json_loads):
+        # Mock Redis client and default game state
+        mock_redis_client = MagicMock()
+        mock_redis_client.get.return_value = '{"health": 100, "score": 0}'
+        mock_json_loads.return_value = {"health": 100, "score": 0}
 
-        user_id = "test_user"
-        state = {"trust": 70}
-        await redis_gamestate.set_game_state(user_id, state)
-        result = await redis_gamestate.get_game_state(user_id)
+        # Call the function
+        result = load_default_gamestate(mock_redis_client)
 
-        self.assertEqual(result, {"trust": 70})
-        mock_redis.set.assert_called_once()
-        mock_redis.get.assert_called_once()
+        # Assertions
+        mock_redis_client.get.assert_called_once_with("gamestate:default")
+        mock_json_loads.assert_called_once_with('{"health": 100, "score": 0}')
+        self.assertEqual(result, {"health": 100, "score": 0})
 
-if __name__ == '__main__':
+    @patch("jens_jugs.redis_gamestate.redis.Redis")
+    def test_load_default_gamestate_not_found(self, mock_redis):
+        # Mock Redis client to return None
+        mock_redis_client = MagicMock()
+        mock_redis_client.get.return_value = None
+
+        # Call the function and expect a ValueError
+        with self.assertRaises(ValueError) as context:
+            load_default_gamestate(mock_redis_client)
+
+        # Assertions
+        mock_redis_client.get.assert_called_once_with("gamestate:default")
+        self.assertIn("Default game state not found in Redis", str(context.exception))
+
+    @patch("jens_jugs.redis_gamestate.load_default_gamestate")
+    @patch("jens_jugs.redis_gamestate.redis.Redis")
+    def test_get_game_state_existing_user(self, mock_redis, mock_load_default_gamestate):
+        # Mock Redis client and user game state
+        mock_redis_client = MagicMock()
+        mock_redis_client.get.return_value = '{"health": 80, "score": 10}'
+
+        # Call the function
+        with patch("jens_jugs.redis_gamestate.r", mock_redis_client):
+            result = get_game_state("user123")
+
+        # Assertions
+        mock_redis_client.get.assert_called_once_with("gamestate:user123")
+        self.assertEqual(result, {"health": 80, "score": 10})
+
+    @patch("jens_jugs.redis_gamestate.load_default_gamestate")
+    @patch("jens_jugs.redis_gamestate.redis.Redis")
+    def test_get_game_state_new_user(self, mock_redis, mock_load_default_gamestate):
+        # Mock Redis client and default game state
+        mock_redis_client = MagicMock()
+        mock_redis_client.get.return_value = None
+        mock_load_default_gamestate.return_value = {"health": 100, "score": 0}
+
+        # Call the function
+        with patch("jens_jugs.redis_gamestate.r", mock_redis_client):
+            result = get_game_state("new_user")
+
+        # Assertions
+        mock_redis_client.get.assert_called_once_with("gamestate:new_user")
+        mock_load_default_gamestate.assert_called_once_with(mock_redis_client)
+        mock_redis_client.set.assert_called_once_with("gamestate:new_user", '{"health": 100, "score": 0}')
+        self.assertEqual(result, {"health": 100, "score": 0})
+
+    @patch("jens_jugs.redis_gamestate.redis.Redis")
+    def test_set_game_state(self, mock_redis):
+        # Mock Redis client
+        mock_redis_client = MagicMock()
+
+        # Call the function
+        with patch("jens_jugs.redis_gamestate.r", mock_redis_client):
+            set_game_state("user123", {"health": 90, "score": 20})
+
+        # Assertions
+        mock_redis_client.set.assert_called_once_with("gamestate:user123", '{"health": 90, "score": 20}')
+
+
+if __name__ == "__main__":
     unittest.main()

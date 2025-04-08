@@ -1,6 +1,6 @@
 import os
 import json
-from jens_jugs.cloudwatch_logger import get_logger
+from jens_jugs.logger import get_logger
 
 def populate_redis_with_defaults(redis_client, logger=None):
     """

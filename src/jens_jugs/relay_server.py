@@ -1,22 +1,35 @@
 # Purpose: Acts as the API gateway between the client app and OpenAI
-from flask import Flask, request, jsonify
-from openai import OpenAI, OpenAIError
 import os
-import logging
+from flask import Flask, request, jsonify
+from openai import OpenAIError
 
 # Additional imports for operation
 from jens_jugs.jwt_auth import jwt_verify  # For JWT verification
 from jens_jugs.auth_service import auth_bp  # For authentication blueprint
 from jens_jugs.rule_evaluator import run_game_rules  # For game state rule evaluation
-from jens_jugs.cloudwatch_logger import get_logger  # For logging to CloudWatch
+from jens_jugs.logger import get_logger  # For logging to CloudWatch
 import jens_jugs.redis_gamestate as redis_gamestate  # For managing game state
 from jens_jugs.rule_executor import apply_rules  # For applying triggered rules
 from jens_jugs.prompt_augmentation import build_prompt  # For augmenting system messages
 from jens_jugs.sys_init import populate_redis_with_defaults  # For initializing system defaults in Redis
+import logging  # For configuring Werkzeug logger
 
 def create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, redis_gamestate, openai_client):
-    logger = get_logger(log_name="relay_server")
+    # Initialize the logger
+    logger = get_logger(log_name="relay_server", streams=["console", "cloudwatch", "file"], config={
+                    "file": {
+                        "path": "./logs",
+                        "max_bytes": 10 * 1024 * 1024,  # 10 MB
+                        "backup_count": 5
+                    }
+                })
     logger.info("Starting the relay server...")
+
+    # Configure Werkzeug to use the same logger
+    werkzeug_logger = logging.getLogger("werkzeug")
+    werkzeug_logger.setLevel(logging.INFO)  # Set the desired log level
+    for handler in logger.handlers:
+        werkzeug_logger.addHandler(handler)
 
     app = Flask(__name__)
     app.register_blueprint(auth_bp)  # Register the auth blueprint here
@@ -124,26 +137,8 @@ def create_app(jwt_verify, auth_bp, run_game_rules, get_logger, build_prompt, re
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set
-    logger = get_logger(log_name="relay_server")
-    logger.info(f"Starting Flask app on port {port}...")
-
-    # Retrieve the OpenAI API key from the environment
-    openai_api_key = os.getenv("OPENAPI_KEY")
-    if not openai_api_key:
-        logger.critical("OPENAPI_KEY is not set in the environment variables.")
-        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
-
-    # Instantiate the OpenAI client
-    openai_client = OpenAI(api_key=openai_api_key)
+    print(f"Starting Flask app on port {port}...")
 
     # Create and run the app
-    app = create_app(
-        jwt_verify=jwt_verify,
-        auth_bp=auth_bp,
-        run_game_rules=run_game_rules,
-        get_logger=get_logger,
-        build_prompt=build_prompt,
-        redis_gamestate=redis_gamestate,
-        openai_client=openai_client,
-    )
+    app = create_app()
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

@@ -3,9 +3,15 @@ from jose import jwt, jwk
 from datetime import datetime, timezone
 import requests
 import os
-from jens_jugs.cloudwatch_logger import get_logger
+from jens_jugs.logger import get_logger
 
-logger = get_logger(log_name="jwt_auth")
+logger = get_logger(log_name="jwt_auth", streams=["console", "cloudwatch", "file"], config={
+                    "file": {
+                        "path": "./logs",
+                        "max_bytes": 10 * 1024 * 1024,  # 10 MB
+                        "backup_count": 5
+                    }
+                })
 
 def jwt_verify(func):
     def wrapper(*args, **kwargs):

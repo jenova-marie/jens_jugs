@@ -7,10 +7,18 @@ from cryptography.hazmat.primitives import serialization
 import json
 import base64
 import redis
-from jens_jugs.cloudwatch_logger import get_logger
+from jens_jugs.logger import get_logger
+import logging  # For configuring Werkzeug logger
 
 # Initialize logger
-logger = get_logger(log_name="auth_service")
+logger = get_logger(log_name="auth_service", streams=["console", "cloudwatch", "file"], config={
+                    "file": {
+                        "path": "./logs",
+                        "max_bytes": 10 * 1024 * 1024,  # 10 MB
+                        "backup_count": 5
+                    }
+                })
+logger.info("Starting the auth service...")
 
 # Connect to Redis
 redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
@@ -103,7 +111,7 @@ else:
     logger.info(f"Using existing key pair with kid: {active_kid}")
 
 # Convert public key to JWK format
-def public_key_to_jwk(public_key):
+def public_key_to_jwk(kid, public_key):
     logger.debug("Converting public key to JWK format.")
     numbers = public_key.public_numbers()
     e = base64.urlsafe_b64encode(numbers.e.to_bytes(3, "big")).decode("utf-8").rstrip("=")
@@ -112,7 +120,7 @@ def public_key_to_jwk(public_key):
     return {
         "kty": "RSA",
         "use": "sig",
-        "kid": active_kid,  # Use the updated Key ID
+        "kid": kid,  # Use the updated Key ID
         "alg": JWT_ALGORITHM,  # Use the JWT_ALGORITHM variable
         "n": n,
         "e": e,
@@ -124,90 +132,75 @@ auth_bp = Blueprint("auth", __name__)
 """Protected endpoint for authentication."""
 @auth_bp.route("/api/auth", methods=["POST"])
 def generate_jwt():
-    logger.debug("Received request for /api/auth endpoint.")
+    try:
+        logger.debug("Received request for /api/auth endpoint.")
 
-    # Retrieve the Authorization header
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({"error": "Unauthorized"}), 401
+        # Retrieve the Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Unauthorized"}), 401
 
-    # Extract the token from the header
-    token = auth_header.split(" ")[1]
-    if token != os.environ.get("API_AUTH_KEY"):
-        return jsonify({"error": "Unauthorized"}), 401
+        # Extract the token from the header
+        token = auth_header.split(" ")[1]
+        if token != os.environ.get("API_AUTH_KEY"):
+            return jsonify({"error": "Unauthorized"}), 401
 
+        user_id = request.json.get("userId")
+        if not user_id:
+            logger.warning("Missing userId in request body.")
+            return jsonify({"error": "Missing userId"}), 400
 
-    user_id = request.json.get("userId")
-    if not user_id:
-        logger.warning("Missing userId in request body.")
-        return jsonify({"error": "Missing userId"}), 400
+        # Fetch the active private key from Redis
+        active_kid = redis_client.get("active_kid")
+        if not active_kid:
+            logger.error("No active_kid found in Redis.")
+            return jsonify({"error": "Failed to retrieve active_kid from Redis"}), 500
 
-    # Fetch the active private key from Redis
-    active_kid = redis_client.get("active_kid")
-    if not active_kid:
-        logger.error("No active_kid found in Redis.")
-        raise RuntimeError("No active_kid found in Redis.")
+        private_key_pem = redis_client.hget(f"jwks:{active_kid}", "private_key")
+        if not private_key_pem:
+            logger.error(f"No private key found for active_kid: {active_kid}")
+            return jsonify({"error": "Failed to retrieve private key from Redis"}), 500
 
-    private_key_pem = redis_client.hget(f"jwks:{active_kid}", "private_key")
-    if not private_key_pem:
-        logger.error(f"No private key found for active_kid: {active_kid}")
-        raise RuntimeError(f"No private key found for active_kid: {active_kid}")
+        logger.info(f"Loaded active_kid: {active_kid} from Redis.")
+        private_key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
 
-    logger.info(f"Loaded active_kid: {active_kid} from Redis.")
-    private_key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
+        # Generate JWT token
+        expiration = datetime.utcnow() + timedelta(seconds=JWT_DURATION)
+        payload = {
+            "userId": user_id,
+            "exp": expiration,
+            "iat": datetime.utcnow(),
+            "iss": "urn:jens-jugs:issuer"  # Add the issuer claim
+        }
+        token = jwt.encode(payload, private_key, algorithm=JWT_ALGORITHM, headers={"kid": active_kid})
 
-    # Generate JWT token
-    expiration = datetime.utcnow() + timedelta(seconds=JWT_DURATION)
-    payload = {
-        "userId": user_id,
-        "exp": expiration,
-        "iat": datetime.utcnow(),
-        "iss": "urn:jens-jugs:issuer"  # Add the issuer claim
-    }
-    token = jwt.encode(payload, private_key, algorithm=JWT_ALGORITHM, headers={"kid": active_kid})
+        logger.info(f"Generated JWT for userId: {user_id}, kid: {active_kid}")
+        logger.debug(f"JWT payload: {payload}")
 
-    logger.info(f"Generated JWT for userId: {user_id}, kid: {active_kid}")
-    logger.debug(f"JWT payload: {payload}")
-
-    return jsonify({"token": token})
+        return jsonify({"token": token})
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({"error": "Unexpected error occurred"}), 500
 
 # JWKS endpoint
 @auth_bp.route("/.well-known/jwks.json", methods=["GET"])
-def jwks():
-    logger.info("Received request for /.well-known/jwks.json endpoint.")
+def get_jwks():
     try:
-        # Connect to Redis using environment variables
-        redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
-        redis_port = int(os.getenv("REDIS_PORT", 6379))    # Default to 6379
-        redis_client = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
-        logger.debug(f"Connected to Redis at {redis_host}:{redis_port}")
-
+        logger.info("Received request for /.well-known/jwks.json endpoint.")
         keys = []
-
-        # Fetch all JWKs from Redis
-        for key_id in redis_client.keys("jwks:*"):
-            logger.debug(f"Processing Redis key: {key_id}")
-            public_key_pem = redis_client.hget(key_id, "public_key")
-            if not public_key_pem:
-                logger.warning(f"No public key found for key_id: {key_id}")
-                continue
-
-            # Convert public key to JWK format
-            public_key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
-            jwk = public_key_to_jwk(public_key)
-            keys.append(jwk)
-            logger.debug(f"Added JWK for key_id: {key_id}: {jwk}")
+        for key in redis_client.scan_iter("jwks:*"):
+            public_key_pem = redis_client.hget(key, "public_key")
+            if public_key_pem:
+                kid = key.split(":")[1]
+                public_key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+                keys.append(public_key_to_jwk(kid, public_key))
 
         if not keys:
-            logger.warning("No JWKs found in Redis.")
+            logger.error("No JWKs found in Redis.")
             return jsonify({"error": "No JWKs found"}), 404
 
         logger.info(f"Returning {len(keys)} JWK(s).")
         return jsonify({"keys": keys}), 200
-
-    except redis.ConnectionError as e:
-        logger.error(f"Redis connection error: {e}")
-        return jsonify({"error": "Failed to connect to Redis"}), 500
     except Exception as e:
-        logger.error(f"Error processing JWKs request: {e}")
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({"error": "Unexpected error occurred"}), 500
