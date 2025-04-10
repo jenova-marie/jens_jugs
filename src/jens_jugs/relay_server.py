@@ -12,7 +12,7 @@ import jens_jugs.redis_gamestate as redis_gamestate  # For managing game state
 from jens_jugs.rule_executor import apply_rules  # For applying triggered rules
 from jens_jugs.build_prompt import build_prompt  # For augmenting system messages
 
-def create_app(openai_client, get_logger):
+def create_app(openai_client, redis_client, get_logger):
     # Initialize the logger
     logger = get_logger(log_name="relay_server", streams=["console", "cloudwatch", "file"], config={
                     "file": {
@@ -77,7 +77,7 @@ def create_app(openai_client, get_logger):
             # Retrieve and update game state
             logger.info(f"Retrieving game state for userId: {user_id}")
             try:
-                game_state = redis_gamestate.get_game_state(user_id)
+                game_state = redis_gamestate.get_game_state(user_id, redis_client)
                 if game_state is None:
                     logger.warning(f"Game state not found for userId: {user_id}. Initializing default state.")
                     game_state = {"trust": 50}  # Default game state
@@ -95,7 +95,7 @@ def create_app(openai_client, get_logger):
                 return jsonify({"error": "Failed to apply game rules"}), 500
 
             try:
-                redis_gamestate.set_game_state(user_id, game_state)
+                redis_gamestate.set_game_state(user_id, game_state, redis_client)
                 logger.info(f"Game state updated for userId: {user_id}")
             except Exception as e:
                 logger.error(f"Error saving game state: {e}")

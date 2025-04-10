@@ -1,0 +1,9 @@
+{
+  "gamestate:default": {
+    "health": 100,
+    "score": 0,
+    "inventory": [],
+    "unlocked_clues": [],
+    "narrativeEvents": []
+  }
+}

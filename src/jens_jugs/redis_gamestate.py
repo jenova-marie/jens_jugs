@@ -1,17 +1,31 @@
 # Purpose: Manages per-user game state persistence using Redis
 
-import redis
 import json
 import os
+from jsonschema import validate, ValidationError
+from jens_jugs.logger import get_logger
 
-# Retrieve Redis host and port from environment variables
-redis_host = os.getenv("REDIS_HOST", "localhost")  # Default to "localhost"
-redis_port = int(os.getenv("REDIS_PORT", 6379))    # Default to 6379
+# Load the Redis schema
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/redis.schema.json")
+with open(SCHEMA_PATH, "r") as schema_file:
+    REDIS_SCHEMA = json.load(schema_file)
 
-# Initialize Redis client
-r = redis.Redis(host=redis_host, port=redis_port, db=0)
+# Load the default Redis data
+DEFAULT_DATA_PATH = os.path.join(os.path.dirname(__file__), "../../data/redis.default.json")
+with open(DEFAULT_DATA_PATH, "r") as default_file:
+    DEFAULT_REDIS_DATA = json.load(default_file)
 
-default_gamestate = None  # Initialize as a global variable
+logger = get_logger(log_name="redis_gamestate")
+
+
+def validate_redis_data(data, schema_section):
+    """Validate Redis data against the schema."""
+    try:
+        validate(instance=data, schema=REDIS_SCHEMA["properties"][schema_section])
+    except ValidationError as e:
+        logger.error(f"Redis data validation error: {e.message}")
+        raise ValueError(f"Invalid Redis data: {e.message}")
+
 
 def load_default_gamestate(redis_client):
     """
@@ -26,44 +40,70 @@ def load_default_gamestate(redis_client):
     Raises:
         ValueError: If the default game state is not found in Redis.
     """
-    global default_gamestate
-
-    # Return immediately if default_gamestate is already loaded
-    if default_gamestate is not None:
-        return default_gamestate
-
     default_gamestate_key = "gamestate:default"
     default_gamestate_data = redis_client.get(default_gamestate_key)
 
     if default_gamestate_data:
+        # Parse the data as JSON
         default_gamestate = json.loads(default_gamestate_data)
+        validate_redis_data(default_gamestate, "gamestate:default")
         return default_gamestate
     else:
-        raise ValueError(f"Default game state not found in Redis under key '{default_gamestate_key}'. Please initialize Redis with default values.")
-        
-def get_game_state(user_id: str):
+        logger.warning(f"Default game state not found in Redis under key '{default_gamestate_key}'. Loading from redis.default.json.")
+        # Load default game state from redis.default.json
+        default_gamestate = DEFAULT_REDIS_DATA.get("gamestate:default")
+        if not default_gamestate:
+            raise ValueError("Default game state is missing in redis.default.json.")
+        # Validate the default game state
+        validate_redis_data(default_gamestate, "gamestate:default")
+        # Add the default game state to Redis
+        redis_client.set(default_gamestate_key, json.dumps(default_gamestate))
+        logger.info(f"Default game state added to Redis under key '{default_gamestate_key}'.")
+        return default_gamestate
+
+
+def get_game_state(user_id: str, redis_client):
     """
     Retrieve the game state for a user from Redis. If no game state is found,
     load and return the default game state, and update Redis with the default data.
 
     Args:
         user_id (str): The ID of the user.
+        redis_client: Redis client instance.
 
     Returns:
         dict: The game state for the user or the default game state.
     """
     key = f"gamestate:{user_id}"
-    data = r.get(key)
+    data = redis_client.get(key)
 
     if data:
-        return json.loads(data)
+        # Parse the data as JSON
+        game_state = json.loads(data)
+        validate_redis_data(game_state, "gamestate:<user_id>")
+        return game_state
     else:
         # If no game state is found, ensure the default game state is loaded
-        default_state = load_default_gamestate(r)
+        default_state = load_default_gamestate(redis_client)
         # Update Redis with the default game state for the user
-        r.set(key, json.dumps(default_state))
+        redis_client.set(key, json.dumps(default_state))
+        logger.info(f"Default game state set for user '{user_id}' in Redis.")
         return default_state
 
-def set_game_state(user_id: str, state: dict):
+
+def set_game_state(user_id: str, state: dict, redis_client):
+    """
+    Set the game state for a user in Redis.
+
+    Args:
+        user_id (str): The ID of the user.
+        state (dict): The game state to set.
+        redis_client: Redis client instance.
+
+    Raises:
+        ValueError: If the game state does not conform to the schema.
+    """
     key = f"gamestate:{user_id}"
-    r.set(key, json.dumps(state))
+    validate_redis_data(state, "gamestate:<user_id>")
+    redis_client.set(key, json.dumps(state))
+    logger.info(f"Game state updated for user '{user_id}' in Redis.")

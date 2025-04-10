@@ -7,6 +7,8 @@ from cryptography.hazmat.primitives import serialization
 import base64
 import redis
 from jens_jugs.logger import get_logger
+from jsonschema import validate, ValidationError
+import json
 
 # Initialize logger
 logger = get_logger(log_name="auth_service", streams=["console", "cloudwatch", "file"], config={
@@ -35,31 +37,86 @@ JWT_DURATION = int(os.getenv("JWT_DURATION", 3600))   # Default to 1 hour (3600 
 JWK_PUBLIC_EXPONENT = int(os.getenv("JWK_PUBLIC_EXPONENT", 65537))  # Default to 65537
 JWK_KEY_SIZE = int(os.getenv("JWK_KEY_SIZE", 2048))  # Default to 2048
 
-# Validate the active key
-logger.info("Validating the active key in Redis.")
-active_kid = redis_client.get("active_kid")
-if active_kid:
-    logger.debug(f"Found active_kid: {active_kid} in Redis.")
-    # Fetch the key pair and expiration time
-    key_data = redis_client.hgetall(f"jwks:{active_kid}")
-    private_key_pem = key_data.get("private_key")
-    public_key_pem = key_data.get("public_key")
-    exp_at = key_data.get("exp_at")
+# Load the Redis schema
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/redis.schema.json")
+with open(SCHEMA_PATH, "r") as schema_file:
+    REDIS_SCHEMA = json.load(schema_file)
 
-    if private_key_pem and public_key_pem and exp_at:
-        logger.debug(f"Key pair for active_kid: {active_kid} retrieved from Redis.")
-        # Check if the key has expired
-        current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-        if current_timestamp >= int(exp_at):
-            logger.warning(f"Key pair for active_kid: {active_kid} has expired. Generating a new key pair.")
+def validate_redis_data(data, schema_section):
+    """Validate Redis data against the schema."""
+    try:
+        validate(instance=data, schema=REDIS_SCHEMA["properties"][schema_section])
+    except ValidationError as e:
+        logger.error(f"Redis data validation error: {e.message}")
+        raise ValueError(f"Invalid Redis data: {e.message}")
+
+def convert_redis_data(data, schema_section):
+    """
+    Convert Redis data into its expected format as defined by redis.schema.json.
+
+    Args:
+        data (dict): The raw data retrieved from Redis.
+        schema_section (str): The schema section to validate against.
+
+    Returns:
+        dict: The converted data.
+
+    Raises:
+        ValueError: If the data cannot be validated or converted.
+    """
+    try:
+        # Convert fields to their expected types before validation
+        if schema_section == "jwks:<kid>":
+            if "exp_at" in data:
+                data["exp_at"] = int(data["exp_at"])  # Convert exp_at to an integer
+
+        # Validate the data against the schema
+        validate(instance=data, schema=REDIS_SCHEMA["properties"][schema_section])
+
+        return data
+    except ValidationError as e:
+        logger.error(f"Redis data validation error: {e.message}")
+        raise ValueError(f"Invalid Redis data: {e.message}")
+    except Exception as e:
+        logger.error(f"Unexpected error during data conversion: {e}")
+        raise ValueError(f"Data conversion error: {e}")
+
+def get_active_key(redis_client):
+    """Retrieve the active key from Redis."""
+    active_kid = redis_client.get("active_kid")
+    if active_kid:
+        logger.debug(f"Found active_kid: {active_kid} in Redis.")
+        # Fetch the key pair and expiration time
+        key_data = redis_client.hgetall(f"jwks:{active_kid}")
+        try:
+            key_data = convert_redis_data(key_data, "jwks:<kid>")
+        except ValueError as e:
+            logger.error(f"Failed to validate or convert key data for active_kid: {active_kid}. Error: {e}")
             active_kid = None  # Mark as invalid to generate a new key pair
         else:
-            logger.info(f"Using existing key pair with active_kid: {active_kid}, exp_at: {exp_at} (UTC).")
+            private_key_pem = key_data.get("private_key")
+            public_key_pem = key_data.get("public_key")
+            exp_at = key_data.get("exp_at")
+
+            if private_key_pem and public_key_pem and exp_at:
+                logger.debug(f"Key pair for active_kid: {active_kid} retrieved from Redis.")
+                # Check if the key has expired
+                current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
+                if current_timestamp >= exp_at:
+                    logger.warning(f"Key pair for active_kid: {active_kid} has expired. Generating a new key pair.")
+                    active_kid = None  # Mark as invalid to generate a new key pair
+                else:
+                    logger.info(f"Using existing key pair with active_kid: {active_kid}, exp_at: {exp_at} (UTC).")
+            else:
+                logger.warning(f"Key pair for active_kid: {active_kid} is missing or invalid. Generating a new key pair.")
+                active_kid = None  # Mark as invalid to generate a new key pair
     else:
-        logger.warning(f"Key pair for active_kid: {active_kid} is missing or invalid. Generating a new key pair.")
-        active_kid = None  # Mark as invalid to generate a new key pair
-else:
-    logger.info("No active_kid found in Redis. Generating a new key pair.")
+        logger.info("No active_kid found in Redis. Generating a new key pair.")
+    return active_kid
+
+# Validate the active key
+logger.info("Validating the active key in Redis.")
+active_kid = get_active_key(redis_client)
 
 # If no valid key pair exists, generate a new one
 if not active_kid:
@@ -154,7 +211,14 @@ def generate_jwt():
             logger.error("No active_kid found in Redis.")
             return jsonify({"error": "Failed to retrieve active_kid from Redis"}), 500
 
-        private_key_pem = redis_client.hget(f"jwks:{active_kid}", "private_key")
+        key_data = redis_client.hgetall(f"jwks:{active_kid}")
+        try:
+            key_data = convert_redis_data(key_data, "jwks:<kid>")
+        except ValueError as e:
+            logger.error(f"Failed to validate or convert key data for active_kid: {active_kid}. Error: {e}")
+            return jsonify({"error": "Invalid key data in Redis"}), 500
+
+        private_key_pem = key_data.get("private_key")
         if not private_key_pem:
             logger.error(f"No private key found for active_kid: {active_kid}")
             return jsonify({"error": "Failed to retrieve private key from Redis"}), 500

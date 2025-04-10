@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Redis State Schema",
+  "description": "Schema defining the structure of the Redis state for the application.",
+  "type": "object",
+  "properties": {
+    "gamestate:default": {
+      "type": "object",
+      "description": "The default game state for new users.",
+      "properties": {
+        "health": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The player's health value."
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The player's score."
+        },
+        "inventory": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of items the user has in their inventory."
+        },
+        "unlocked_clues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of clues the user has unlocked."
+        },
+        "narrativeEvents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of narrative events the user has triggered."
+        }
+      }
+    },
+    "gamestate:<user_id>": {
+      "type": "object",
+      "description": "The game state for a specific user.",
+      "properties": {
+        "health": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The player's health value."
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The player's score."
+        },
+        "inventory": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of items the user has in their inventory."
+        },
+        "unlocked_clues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of clues the user has unlocked."
+        },
+        "narrativeEvents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of narrative events the user has triggered."
+        }
+      }
+    },
+    "jwks:<kid>": {
+      "type": "object",
+      "description": "JSON Web Key Set (JWKS) data for a specific key ID.",
+      "properties": {
+        "private_key": {
+          "type": "string",
+          "description": "The private key used for signing JWTs."
+        },
+        "public_key": {
+          "type": "string",
+          "description": "The public key used for verifying JWTs."
+        },
+        "exp_at": {
+          "type": "integer",
+          "description": "The expiration timestamp (UTC) for this key."
+        }
+      },
+      "required": ["private_key", "public_key", "exp_at"]
+    },
+    "rate_limits:<user_or_ip>": {
+      "type": "object",
+      "description": "Rate-limiting data for a specific user or IP address.",
+      "properties": {
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The number of remaining requests allowed for this user or IP."
+        },
+        "reset_time": {
+          "type": "integer",
+          "description": "The timestamp when the rate limit resets."
+        }
+      },
+      "required": ["remaining", "reset_time"]
+    }
+  },
+  "additionalProperties": false
+}

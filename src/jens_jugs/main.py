@@ -98,7 +98,7 @@ def start(ctx, secret, log_reset, debug):
     openai_client = OpenAI(api_key=openai_api_key)
 
     # Create the Flask app with the OpenAI client
-    app = create_app(openai_client, get_logger)
+    app = create_app(openai_client, redis_client, get_logger)
 
     # Start the Flask app
     port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set

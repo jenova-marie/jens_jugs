@@ -1,6 +1,7 @@
 import os
 import json
 from jens_jugs.logger import get_logger
+from jsonschema import validate, ValidationError
 
 def populate_redis_with_defaults(redis_client, logger=None):
     """
@@ -18,6 +19,19 @@ def populate_redis_with_defaults(redis_client, logger=None):
     redis_json_path = os.path.join(base_dir, "defaults", "redis.json")
     logger.info(f"Loading default Redis data from {redis_json_path}...")
 
+    # Load the Redis schema
+    SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/redis.schema.json")
+    with open(SCHEMA_PATH, "r") as schema_file:
+        REDIS_SCHEMA = json.load(schema_file)
+
+    def validate_redis_data(data, schema_section):
+        """Validate Redis data against the schema."""
+        try:
+            validate(instance=data, schema=REDIS_SCHEMA["properties"][schema_section])
+        except ValidationError as e:
+            logger.error(f"Redis data validation error: {e.message}")
+            raise ValueError(f"Invalid Redis data: {e.message}")
+
     try:
         with open(redis_json_path, "r") as f:
             default_redis_data = json.load(f)
@@ -26,6 +40,8 @@ def populate_redis_with_defaults(redis_client, logger=None):
         for key, value in default_redis_data.items():
             if not redis_client.exists(key):
                 logger.info(f"Key '{key}' not found in Redis. Adding default value.")
+                schema_section = "gamestate:default" if key == "gamestate:default" else "gamestate:<user_id>"
+                validate_redis_data(value, schema_section)
                 if isinstance(value, dict):
                     # Serialize the dictionary to a JSON string
                     redis_client.set(key, json.dumps(value))
