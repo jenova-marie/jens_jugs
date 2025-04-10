@@ -71,7 +71,7 @@
 
 ### AI Integration
 - AI is used for:
-  - Prompt augmentation (via `prompt_augmentation.py`).
+  - Prompt augmentation (via `build_prompt.py`).
   - Rule evaluation (via `rule_evaluator.py`).
   - Narrative generation and adaptive dialogue.
 - Future plans include:

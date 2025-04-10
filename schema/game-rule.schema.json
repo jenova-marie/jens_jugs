@@ -1,24 +1,27 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Game Rule",
+  "description": "Schema for defining game rules, including conditions and actions to modify the game state.",
   "type": "object",
   "properties": {
     "id": {
       "type": "string",
-      "description": "Unique identifier for the rule"
+      "description": "Unique identifier for the rule."
     },
     "condition": {
       "type": "object",
-      "description": "Logical condition block to evaluate",
+      "description": "Logical condition block to evaluate. Determines whether the rule's actions should be executed.",
       "properties": {
         "all": {
           "type": "array",
+          "description": "Array of conditions that must all evaluate to true (AND logic).",
           "items": {
             "$ref": "#/definitions/conditionClause"
           }
         },
         "any": {
           "type": "array",
+          "description": "Array of conditions where at least one must evaluate to true (OR logic).",
           "items": {
             "$ref": "#/definitions/conditionClause"
           }
@@ -28,6 +31,7 @@
     },
     "actions": {
       "type": "array",
+      "description": "Array of actions to execute if the condition evaluates to true.",
       "items": {
         "$ref": "#/definitions/actionClause"
       }
@@ -41,12 +45,15 @@
   "definitions": {
     "conditionClause": {
       "type": "object",
+      "description": "Defines a single condition clause for evaluating the game state.",
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "The field in the game state to evaluate."
         },
         "operator": {
           "type": "string",
+          "description": "The comparison operator to use for evaluation.",
           "enum": [
             "==",
             "!=",
@@ -57,7 +64,9 @@
             "includes"
           ]
         },
-        "value": {}
+        "value": {
+          "description": "The value to compare the field against. Can be a string, number, or boolean."
+        }
       },
       "required": [
         "field",
@@ -67,9 +76,11 @@
     },
     "actionClause": {
       "type": "object",
+      "description": "Defines a single action to modify the game state.",
       "properties": {
         "type": {
           "type": "string",
+          "description": "The type of action to perform.",
           "enum": [
             "addNarrative",
             "assign",
@@ -81,13 +92,37 @@
             "unlockClue"
           ]
         },
-        "field": { "type": "string" },
-        "value": {},
-        "amount": { "type": "number" },
-        "target": { "type": "string" },
-        "category": { "type": "string" },
-        "flag": { "type": "string" },
-        "clue": { "type": "string" }
+        "field": {
+          "type": "string",
+          "description": "The field in the game state to modify (if applicable)."
+        },
+        "value": {
+          "description": "The value to set or add to the field (if applicable)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount to increase or decrease a numeric field (if applicable)."
+        },
+        "target": {
+          "type": "string",
+          "description": "The target entity or object for the action (if applicable)."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the action (if applicable)."
+        },
+        "flag": {
+          "type": "string",
+          "description": "A flag to set or modify in the game state (if applicable)."
+        },
+        "clue": {
+          "type": "string",
+          "description": "The clue to unlock (for unlockClue actions)."
+        },
+        "scene": {
+          "type": "string",
+          "description": "The narrative scene to add (for addNarrative actions)."
+        }
       },
       "required": ["type"],
       "additionalProperties": true

@@ -1,4 +1,13 @@
 import copy
+import json
+import os
+from jsonschema import validate, ValidationError
+
+# Load the schema once as a global variable
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/game-rule.schema.json")
+with open(SCHEMA_PATH, "r") as schema_file:
+    RULE_SCHEMA = json.load(schema_file)
+
 
 def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
     """Apply a list of rules to a given state."""
@@ -6,32 +15,40 @@ def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
     logs = []
 
     for rule in rules:
-        if 'condition' in rule and not evaluate_condition(rule['condition'], updated_state):
+        # Validate the rule against the schema
+        try:
+            validate(instance=rule, schema=RULE_SCHEMA)
+        except ValidationError as e:
+            raise ValueError(f"Invalid rule: {e.message}")
+
+        # Evaluate the condition (if present)
+        if "condition" in rule and not evaluate_condition(rule["condition"], updated_state):
             continue
 
-        for action in rule.get('actions', []):
-            action_type = action.get('type')
+        # Apply actions
+        for action in rule.get("actions", []):
+            action_type = action["type"]
             match action_type:
                 case "set":
-                    key, value = action["key"], action["value"]
-                    updated_state[key] = value
-                    logs.append(f"Set {key} to {value}")
+                    field, value = action["field"], action["value"]
+                    updated_state[field] = value
+                    logs.append(f"Set {field} to {value}")
                 case "increase":
-                    key, amount = action["key"], action["amount"]
-                    updated_state[key] = updated_state.get(key, 0) + amount
-                    logs.append(f"Increased {key} by {amount}")
+                    field, amount = action["field"], action["amount"]
+                    updated_state[field] = updated_state.get(field, 0) + amount
+                    logs.append(f"Increased {field} by {amount}")
                 case "decrease":
-                    key, amount = action["key"], action["amount"]
-                    updated_state[key] = updated_state.get(key, 0) - amount
-                    logs.append(f"Decreased {key} by {amount}")
+                    field, amount = action["field"], action["amount"]
+                    updated_state[field] = updated_state.get(field, 0) - amount
+                    logs.append(f"Decreased {field} by {amount}")
                 case "unlockClue":
                     clue = action["clue"]
                     updated_state.setdefault("unlocked_clues", []).append(clue)
                     logs.append(f"Unlocked clue: {clue}")
                 case "addNarrative":
-                    flag = action["flag"]
-                    updated_state.setdefault("narrative_flags", {})[flag] = True
-                    logs.append(f"Narrative flag added: {flag}")
+                    scene = action["scene"]
+                    updated_state.setdefault("narrativeEvents", []).append(scene)
+                    logs.append(f"Narrative scene added: {scene}")
                 case _:
                     logs.append(f"Unknown action: {action_type}")
 
@@ -40,17 +57,18 @@ def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
 
 def evaluate_condition(condition: dict, state: dict) -> bool:
     """Basic evaluator for rule conditions."""
-    key = condition.get("key")
-    op = condition.get("op")
+    field = condition.get("field")
+    operator = condition.get("operator")
     value = condition.get("value")
 
-    current = state.get(key)
+    current = state.get(field)
 
-    match op:
+    match operator:
         case "==": return current == value
         case "!=": return current != value
         case ">": return current > value
         case "<": return current < value
         case ">=": return current >= value
         case "<=": return current <= value
+        case "includes": return isinstance(current, list) and value in current
         case _: return False

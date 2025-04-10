@@ -1,7 +1,7 @@
 """
 logger.py
 
-This module provides the `RedNeckLogger` class for creating and managing loggers with support for multiple logging streams, including console, CloudWatch, and file-based logging. The logger can be configured using a `config` dictionary or the `LOG_CONFIG` environment variable.
+This module provides the `Logger` class for creating and managing loggers with support for multiple logging streams, including console, CloudWatch, and file-based logging. The logger can be configured using a `config` dictionary or the `LOG_CONFIG` environment variable.
 """
 
 from datetime import datetime
@@ -39,10 +39,10 @@ class ColorFormatter(logging.Formatter):
             return super().format(record)
 
 
-class RedNeckLogger:
+class Logger:
     def __init__(self, log_name, streams=None, level="INFO", config=None):
         """
-        Initialize the RedNeckLogger.
+        Initialize the Logger.
 
         Args:
             log_name (str): The base name for the log stream (e.g., "auth_service").
@@ -108,7 +108,7 @@ class RedNeckLogger:
 
         # Delete the log stream if log_reset is True
         if self.log_reset:
-            print("[RedNeckLogger] Resetting log stream...")
+            print("[Logger] Resetting log stream...")
             self._delete_log_stream()
 
         # Define the custom log format
@@ -158,7 +158,7 @@ class RedNeckLogger:
 
         # Reset log files if log_reset is True
         if self.log_reset:
-            print(f"[RedNeckLogger] Resetting log files in {log_folder}...")
+            print(f"[Logger] Resetting log files in {log_folder}...")
             if os.path.exists(log_folder):
                 for file in os.listdir(log_folder):
                     file_path = os.path.join(log_folder, file)
@@ -185,7 +185,7 @@ class RedNeckLogger:
 
     def _delete_log_stream(self):
         """Delete the log stream if it exists."""
-        print(f"[RedNeckLogger] Attempting to delete log stream: {self.log_stream_name}")
+        print(f"[Logger] Attempting to delete log stream: {self.log_stream_name}")
         session = boto3.Session()
         client = session.client("logs", region_name=os.getenv("AWS_REGION", "us-east-1"))
         try:
@@ -193,15 +193,15 @@ class RedNeckLogger:
                 logGroupName=self.log_group_name,
                 logStreamName=self.log_stream_name
             )
-            print(f"[RedNeckLogger] Log stream {self.log_stream_name} deleted successfully.")
+            print(f"[Logger] Log stream {self.log_stream_name} deleted successfully.")
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                print(f"[RedNeckLogger] Log stream {self.log_stream_name} does not exist.")
+                print(f"[Logger] Log stream {self.log_stream_name} does not exist.")
             else:
-                print(f"[RedNeckLogger] Failed to delete log stream: {e}")
+                print(f"[Logger] Failed to delete log stream: {e}")
 
 
 # Usage example
 def get_logger(log_name=None, streams=["console"], level="INFO", config=None):
-    logger = RedNeckLogger(log_name=log_name, streams=streams, level=level, config=config)
+    logger = Logger(log_name=log_name, streams=streams, level=level, config=config)
     return logger.setup_logger()

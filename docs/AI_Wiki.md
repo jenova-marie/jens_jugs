@@ -15,7 +15,7 @@ AI is used to provide dynamic and immersive gameplay by:
 
 ## **2. AI Integration Points**
 ### **a. Prompt Augmentation**
-- The `prompt_augmentation.py` module uses OpenAI's API to:
+- The `build_prompt.py` module uses OpenAI's API to:
   - Generate responses for player queries.
   - Incorporate game state elements (e.g., inventory, trust levels) into the prompts.
   - Provide contextually relevant hints or narrative progressions.

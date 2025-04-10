@@ -61,7 +61,7 @@ yarn.lock
 *.7z
 
 # IDE/editor
-.vscode/
+# .vscode/
 .idea/
 *.swp
 

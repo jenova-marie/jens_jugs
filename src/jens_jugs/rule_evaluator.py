@@ -1,3 +1,12 @@
+import json
+import os
+from jsonschema import validate, ValidationError
+
+# Load the schema once as a global variable
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/game-rule.schema.json")
+with open(SCHEMA_PATH, "r") as schema_file:
+    GAME_RULE_SCHEMA = json.load(schema_file)
+
 # Applies a single action to mutate the game state based on rule logic
 def apply_action(game_state: dict, action: dict) -> None:
     action_type = action["type"]
@@ -77,7 +86,24 @@ def evaluate_condition(game_state: dict, condition: dict) -> bool:
 
 # Runs a set of rules, applying actions if conditions evaluate to True
 def run_game_rules(game_state: dict, rules: list[dict]) -> None:
+    """
+    Apply game rules to the game state.
+
+    Args:
+        game_state (dict): The current game state.
+        rules (list): A list of rules to apply.
+
+    Raises:
+        ValueError: If a rule fails validation.
+    """
     for rule in rules:
+        # Validate the rule against the schema
+        try:
+            validate(instance=rule, schema=GAME_RULE_SCHEMA)
+        except ValidationError as e:
+            raise ValueError(f"Invalid rule: {e.message}")
+
+        # Evaluate the condition and apply actions if the condition is met
         if evaluate_condition(game_state, rule["condition"]):
             for action in rule["actions"]:
                 apply_action(game_state, action)

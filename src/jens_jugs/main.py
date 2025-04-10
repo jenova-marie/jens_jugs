@@ -1,6 +1,4 @@
 import click
-import subprocess
-from pathlib import Path
 import os
 import json
 import redis
@@ -10,6 +8,7 @@ import sys
 from jens_jugs.relay_server import create_app
 from jens_jugs.logger import get_logger
 from jens_jugs.sys_init import populate_redis_with_defaults
+from openai import OpenAI  # Assuming OpenAI is the correct client library
 
 logger = get_logger(log_name="main", streams=["console", "cloudwatch", "file"], config={
                     "file": {
@@ -91,7 +90,15 @@ def start(ctx, secret, log_reset, debug):
     # Populate Redis with default or updated data if required
     populate_redis_with_defaults(redis_client, logger)
 
-    app = create_app()
+    # Create the OpenAI client
+    openai_api_key = os.getenv("OPENAPI_KEY")
+    if not openai_api_key:
+        raise EnvironmentError("OPENAPI_KEY is not set in the environment variables.")
+
+    openai_client = OpenAI(api_key=openai_api_key)
+
+    # Create the Flask app with the OpenAI client
+    app = create_app(openai_client, get_logger)
 
     # Start the Flask app
     port = int(os.getenv("API_PORT_HTTP", 6000))  # Default to port 6000 if API_PORT_HTTP is not set

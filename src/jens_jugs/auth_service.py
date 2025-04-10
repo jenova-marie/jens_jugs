@@ -4,11 +4,9 @@ from datetime import datetime, timedelta, timezone
 import os
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
-import json
 import base64
 import redis
 from jens_jugs.logger import get_logger
-import logging  # For configuring Werkzeug logger
 
 # Initialize logger
 logger = get_logger(log_name="auth_service", streams=["console", "cloudwatch", "file"], config={
