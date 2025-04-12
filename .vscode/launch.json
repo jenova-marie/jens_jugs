@@ -24,34 +24,40 @@
             }
         },
         {
-            "name": "Test RelayServer",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/test_relay_server.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Test RuleEvaluator",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/test_rule_evaluator.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
             "name": "Debug Pytest - RelayServer",
             "type": "python",
             "request": "launch",
             "module": "pytest",
             "args": [
                 "tests/test_relay_server.py"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug Pytest - RuleEvaluator",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/test_rule_evaluator.py"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug Pytest - RuleExecutor",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/test_rule_executor.py"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Game State Schema",
+  "type": "object",
+  "properties": {
+    "health": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The player's health value."
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The player's score."
+    },
+    "inventory": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "A list of items the user has in their inventory."
+    },
+    "unlocked_clues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "A list of clues the user has unlocked."
+    },
+    "narrativeEvents": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "A list of narrative events the user has triggered."
+    }
+  },
+  "required": ["health", "score"]
+}

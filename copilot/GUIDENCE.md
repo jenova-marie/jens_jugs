@@ -73,7 +73,7 @@
 │   ├── GUIDENCE.md        # Best practices and project-specific guidelines.
 │   ├── GUIDENCE.pdf       # PDF version of the guidance document.
 ├── data/                  # Contains default data and reports.
-│   ├── redis.default.json # Default Redis data for initializing the database.
+│   ├── game-state.default.json # Default Redis data for initializing the database.
 ├── docs/                  # Documentation for the project.
 │   ├── AI_Wiki.md         # AI-related documentation.
 │   ├── TESTING.md         # Testing strategies and guidelines.

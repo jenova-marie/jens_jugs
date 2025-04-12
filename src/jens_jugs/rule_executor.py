@@ -1,12 +1,16 @@
 import copy
 import json
 import os
-from jsonschema import validate, ValidationError
+from jsonschema import validate, ValidationError, RefResolver
 
 # Load the schema once as a global variable
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "../../schema/game-rule.schema.json")
+SCHEMA_DIR = os.path.join(os.path.dirname(__file__), "../../schema")
+SCHEMA_PATH = os.path.join(SCHEMA_DIR, "game-rule.schema.json")
 with open(SCHEMA_PATH, "r") as schema_file:
     RULE_SCHEMA = json.load(schema_file)
+
+# Create a RefResolver for resolving $ref in the schema
+RESOLVER = RefResolver(base_uri=f"file://{SCHEMA_DIR}/", referrer=RULE_SCHEMA)
 
 
 def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
@@ -15,11 +19,12 @@ def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
     logs = []
 
     for rule in rules:
-        # Validate the rule against the schema
+        # Validate the rule against the schema using the resolver
         try:
-            validate(instance=rule, schema=RULE_SCHEMA)
+            validate(instance=rule, schema=RULE_SCHEMA, resolver=RESOLVER)
         except ValidationError as e:
-            raise ValueError(f"Invalid rule: {e.message}")
+            logs.append(f"Invalid rule: {e.message}")
+            continue  # Skip invalid rules
 
         # Evaluate the condition (if present)
         if "condition" in rule and not evaluate_condition(rule["condition"], updated_state):
@@ -27,7 +32,13 @@ def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
 
         # Apply actions
         for action in rule.get("actions", []):
+            if "type" not in action:
+                raise ValueError("Invalid rule: 'type' is a required property in action")
+            
             action_type = action["type"]
+            if action_type not in ["set", "increase", "decrease", "unlockClue", "addNarrative"]:
+                raise ValueError(f"Invalid rule: '{action_type}' is not one of ['addNarrative', 'assign', 'decrease', 'increase', 'reward', 'set', 'trust', 'unlockClue']")
+            
             match action_type:
                 case "set":
                     field, value = action["field"], action["value"]
@@ -49,14 +60,23 @@ def apply_rules(state: dict, rules: list) -> tuple[dict, list]:
                     scene = action["scene"]
                     updated_state.setdefault("narrativeEvents", []).append(scene)
                     logs.append(f"Narrative scene added: {scene}")
-                case _:
-                    logs.append(f"Unknown action: {action_type}")
 
     return updated_state, logs
 
 
 def evaluate_condition(condition: dict, state: dict) -> bool:
-    """Basic evaluator for rule conditions."""
+    """Enhanced evaluator for rule conditions."""
+    if "all" in condition:
+        # Evaluate all subconditions and return True only if all are True
+        return all(evaluate_condition(sub_condition, state) for sub_condition in condition["all"])
+    elif "any" in condition:
+        # Evaluate all subconditions and return True if any are True
+        return any(evaluate_condition(sub_condition, state) for sub_condition in condition["any"])
+    elif "not" in condition:
+        # Negate the result of the subcondition
+        return not evaluate_condition(condition["not"], state)
+
+    # Handle simple conditions
     field = condition.get("field")
     operator = condition.get("operator")
     value = condition.get("value")

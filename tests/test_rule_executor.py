@@ -109,9 +109,8 @@ def test_apply_rules_unknown_action():
             "actions": [{"type": "unknownAction"}]
         }
     ]
-    updated_state, logs = apply_rules(state, rules)
-    assert updated_state == state
-    assert "Unknown action: unknownAction" in logs
+    with pytest.raises(ValueError, match="Invalid rule: 'unknownAction' is not one of"):
+        apply_rules(state, rules)
 
 
 def test_evaluate_condition_equal():
